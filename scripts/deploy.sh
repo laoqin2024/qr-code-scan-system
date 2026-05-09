@@ -257,38 +257,50 @@ collect_config() {
 
 # 安装系统依赖
 install_dependencies() {
-    if [ "$NEED_GIT" = true ] || [ "$NEED_NODE" = true ]; then
-        print_info "检测到缺少必要依赖，开始安装..."
-        
-        if [[ "$OS" == "Linux" ]]; then
-            # 检测 Linux 发行版
-            if [ -f /etc/debian_version ]; then
-                # Debian/Ubuntu
-                print_info "检测到 Debian/Ubuntu 系统"
-                sudo apt-get update
-                [ "$NEED_GIT" = true ] && sudo apt-get install -y git
-                [ "$NEED_NODE" = true ] && sudo apt-get install -y nodejs npm
-            elif [ -f /etc/redhat-release ]; then
-                # CentOS/RHEL
-                print_info "检测到 CentOS/RHEL 系统"
-                [ "$NEED_GIT" = true ] && sudo yum install -y git
-                [ "$NEED_NODE" = true ] && sudo yum install -y nodejs npm
-            fi
-        elif [[ "$OS" == "Darwin" ]]; then
-            # macOS
-            print_info "检测到 macOS 系统"
-            if ! check_command brew; then
-                print_error "请先安装 Homebrew: https://brew.sh"
-                exit 1
-            fi
-            [ "$NEED_GIT" = true ] && brew install git
-            [ "$NEED_NODE" = true ] && brew install node
+    print_info "安装编译工具和依赖..."
+    
+    if [[ "$OS" == "Linux" ]]; then
+        # 检测 Linux 发行版
+        if [ -f /etc/debian_version ]; then
+            # Debian/Ubuntu
+            print_info "检测到 Debian/Ubuntu 系统"
+            sudo apt-get update
+            
+            # 安装编译工具
+            print_info "安装编译工具..."
+            sudo apt-get install -y build-essential python3 python3-distutils python3-dev
+            
+            # 安装 Git 和 Node.js
+            [ "$NEED_GIT" = true ] && sudo apt-get install -y git
+            [ "$NEED_NODE" = true ] && sudo apt-get install -y nodejs npm
+            
+        elif [ -f /etc/redhat-release ]; then
+            # CentOS/RHEL
+            print_info "检测到 CentOS/RHEL 系统"
+            
+            # 安装编译工具
+            print_info "安装编译工具..."
+            sudo yum groupinstall -y "Development Tools"
+            sudo yum install -y python3 python3-devel
+            
+            # 安装 Git 和 Node.js
+            [ "$NEED_GIT" = true ] && sudo yum install -y git
+            [ "$NEED_NODE" = true ] && sudo yum install -y nodejs npm
+        fi
+    elif [[ "$OS" == "Darwin" ]]; then
+        # macOS
+        print_info "检测到 macOS 系统"
+        if ! check_command brew; then
+            print_error "请先安装 Homebrew: https://brew.sh"
+            exit 1
         fi
         
-        print_success "系统依赖安装完成"
-    else
-        print_success "系统依赖检查通过"
+        # macOS 通常已有编译工具
+        [ "$NEED_GIT" = true ] && brew install git
+        [ "$NEED_NODE" = true ] && brew install node
     fi
+    
+    print_success "系统依赖安装完成"
     
     # 安装 PM2（如果需要）
     if [ "$USE_PM2" = "y" ] && [ "$HAS_PM2" = false ]; then
