@@ -155,8 +155,9 @@ check_environment() {
         print_success "Nginx: $NGINX_VERSION"
         HAS_NGINX=true
     else
-        print_warning "Nginx 未安装（可选）"
+        print_warning "Nginx 未安装（推荐安装用于反向代理）"
         HAS_NGINX=false
+        NEED_NGINX=true
     fi
     
     # 检查 pm2
@@ -165,8 +166,9 @@ check_environment() {
         print_success "PM2: $PM2_VERSION"
         HAS_PM2=true
     else
-        print_warning "PM2 未安装（推荐安装）"
+        print_warning "PM2 未安装（推荐安装用于进程管理）"
         HAS_PM2=false
+        NEED_PM2=true
     fi
     
     echo ""
@@ -217,22 +219,51 @@ collect_config() {
     JWT_SECRET=$(openssl rand -base64 32 2>/dev/null || cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     print_success "JWT Secret 已生成"
     
-    # 是否配置 Nginx
+    # 是否安装 Nginx
     echo ""
-    if [ "$HAS_NGINX" = true ]; then
+    if [ "$NEED_NGINX" = true ]; then
+        print_warning "检测到 Nginx 未安装"
+        echo "Nginx 用于："
+        echo "  - 反向代理后端 API"
+        echo "  - 托管前端静态文件"
+        echo "  - 提供更好的性能和安全性"
+        echo ""
+        read -p "是否安装 Nginx？(y/n) [默认: y]: " INSTALL_NGINX
+        INSTALL_NGINX=${INSTALL_NGINX:-y}
+        
+        if [ "$INSTALL_NGINX" = "y" ]; then
+            SETUP_NGINX=y
+        else
+            SETUP_NGINX=n
+            print_warning "不安装 Nginx，需要手动配置 Web 服务器"
+        fi
+    else
         read -p "是否配置 Nginx 反向代理？(y/n) [默认: y]: " SETUP_NGINX
         SETUP_NGINX=${SETUP_NGINX:-y}
-    else
-        SETUP_NGINX=n
     fi
     
-    # 是否使用 PM2
+    # 是否安装 PM2
     echo ""
-    if [ "$HAS_PM2" = true ]; then
+    if [ "$NEED_PM2" = true ]; then
+        print_warning "检测到 PM2 未安装"
+        echo "PM2 用于："
+        echo "  - 进程管理和监控"
+        echo "  - 自动重启崩溃的进程"
+        echo "  - 开机自启动"
+        echo "  - 日志管理"
+        echo ""
+        read -p "是否安装 PM2？(y/n) [默认: y]: " INSTALL_PM2
+        INSTALL_PM2=${INSTALL_PM2:-y}
+        
+        if [ "$INSTALL_PM2" = "y" ]; then
+            USE_PM2=y
+        else
+            USE_PM2=n
+            print_warning "不安装 PM2，将使用 nohup 启动服务"
+        fi
+    else
         read -p "是否使用 PM2 管理进程？(y/n) [默认: y]: " USE_PM2
         USE_PM2=${USE_PM2:-y}
-    else
-        USE_PM2=n
     fi
     
     # 确认配置
@@ -243,8 +274,23 @@ collect_config() {
     echo "后端端口: $BACKEND_PORT"
     echo "前端端口: $FRONTEND_PORT"
     echo "服务器地址: $SERVER_HOST"
-    echo "配置 Nginx: $SETUP_NGINX"
-    echo "使用 PM2: $USE_PM2"
+    echo ""
+    echo "服务配置:"
+    if [ "$INSTALL_NGINX" = "y" ]; then
+        echo "  Nginx: 将安装并配置"
+    elif [ "$SETUP_NGINX" = "y" ]; then
+        echo "  Nginx: 已安装，将配置"
+    else
+        echo "  Nginx: 不使用"
+    fi
+    
+    if [ "$INSTALL_PM2" = "y" ]; then
+        echo "  PM2: 将安装并使用"
+    elif [ "$USE_PM2" = "y" ]; then
+        echo "  PM2: 已安装，将使用"
+    else
+        echo "  PM2: 不使用（使用 nohup）"
+    fi
     echo ""
     
     read -p "确认以上配置？(y/n) " -n 1 -r
@@ -302,11 +348,28 @@ install_dependencies() {
     
     print_success "系统依赖安装完成"
     
+    # 安装 Nginx（如果需要）
+    if [ "$INSTALL_NGINX" = "y" ]; then
+        print_info "安装 Nginx..."
+        if [[ "$OS" == "Linux" ]]; then
+            if [ -f /etc/debian_version ]; then
+                sudo apt-get install -y nginx
+            elif [ -f /etc/redhat-release ]; then
+                sudo yum install -y nginx
+            fi
+        elif [[ "$OS" == "Darwin" ]]; then
+            brew install nginx
+        fi
+        print_success "Nginx 安装完成"
+        HAS_NGINX=true
+    fi
+    
     # 安装 PM2（如果需要）
-    if [ "$USE_PM2" = "y" ] && [ "$HAS_PM2" = false ]; then
+    if [ "$INSTALL_PM2" = "y" ]; then
         print_info "安装 PM2..."
         sudo npm install -g pm2
         print_success "PM2 安装完成"
+        HAS_PM2=true
     fi
 }
 
