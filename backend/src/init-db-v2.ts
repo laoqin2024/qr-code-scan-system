@@ -31,10 +31,18 @@ try {
   // 创建超级管理员
   const adminPassword = await bcrypt.hash('admin123', 10);
   db.prepare(`
-    INSERT INTO users (username, password_hash, role, is_active, created_at)
-    VALUES (?, ?, 'super_admin', 1, datetime('now'))
-  `).run('admin', adminPassword);
+    INSERT INTO users (username, password_hash, role, is_active, created_at, display_name)
+    VALUES (?, ?, 'super_admin', 1, datetime('now'), ?)
+  `).run('admin', adminPassword, '系统管理员');
   console.log('  ✓ 超级管理员: admin / admin123');
+  
+  // 创建测试客户管理员（不绑定客户）
+  const testPassword = await bcrypt.hash('test123', 10);
+  db.prepare(`
+    INSERT INTO users (username, password_hash, role, is_active, created_at, display_name)
+    VALUES (?, ?, 'customer_admin', 1, datetime('now'), ?)
+  `).run('test', testPassword, '测试管理员');
+  console.log('  ✓ 客户管理员: test / test123 (测试账号)');
   
   // 创建示例客户
   console.log('\n🏢 创建示例数据...');
@@ -139,6 +147,10 @@ try {
   console.log('    用户名: admin');
   console.log('    密码: admin123');
   console.log('    权限: 全局管理');
+  console.log('\n  客户管理员 (测试账号):');
+  console.log('    用户名: test');
+  console.log('    密码: test123');
+  console.log('    权限: 可创建客户、产品、用户');
   console.log('\n  客户管理员 (富士康):');
   console.log('    用户名: foxconn_manager');
   console.log('    密码: manager123');

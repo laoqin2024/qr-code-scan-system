@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/app.ts",
-    "init": "tsx src/init-data.ts",
-    "init-v2": "tsx src/init-db-v2.ts",
-    "migrate": "tsx src/migrate.ts",
+    "start": "tsx src/app.ts",
+    "init-db": "tsx src/init-db-v2.ts",
     "migrate-v3": "tsx src/migrate-v3.ts"
   },
   "dependencies": {

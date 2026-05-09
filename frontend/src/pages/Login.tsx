@@ -69,7 +69,11 @@ const Login: React.FC = () => {
             {loading ? '登录中...' : '登录'}
           </button>
         </form>
-        <p className="hint">演示账号：admin / admin123</p>
+        <div className="hint">
+          <p>测试账号：</p>
+          <p>• 超级管理员：admin / admin123</p>
+          <p>• 客户管理员：test / test123</p>
+        </div>
       </div>
     </div>
   );
