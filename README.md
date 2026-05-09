@@ -2,6 +2,37 @@
 
 一个基于 React + Node.js 的企业级二维码扫码管理系统，支持多客户、多产品、多用户的权限管理。
 
+## 🚀 一键部署
+
+### 自动化部署（推荐）
+
+在生产服务器上执行以下命令，自动完成部署：
+
+```bash
+bash <(curl -fsSL https://gitee.com/laoqin1/qr-code-scan-system/raw/main/scripts/deploy.sh)
+```
+
+或使用 GitHub（国外服务器）：
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/laoqin2024/qr-code-scan-system/main/scripts/deploy.sh)
+```
+
+**部署脚本会自动：**
+- ✅ 检查并安装依赖（Git、Node.js、编译工具）
+- ✅ 克隆项目代码
+- ✅ 配置环境变量
+- ✅ 安装项目依赖
+- ✅ 构建前端
+- ✅ 初始化数据库
+- ✅ 配置 Nginx（可选）
+- ✅ 配置 PM2（可选）
+- ✅ 启动服务
+
+**详细文档：** [部署指南](DEPLOY.md) | [完整文档](docs/DEPLOYMENT_GUIDE.md)
+
+---
+
 ## 📋 系统简介
 
 本系统用于二维码扫描验证，支持设定期望长度，自动检测长度不足或超出的情况，帮助企业提高扫码准确率。
@@ -45,7 +76,7 @@
 
 ---
 
-## 📦 快速开始
+## 📦 手动部署
 
 ### 前置要求
 
