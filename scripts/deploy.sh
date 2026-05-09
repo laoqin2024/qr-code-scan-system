@@ -301,9 +301,36 @@ collect_config() {
     fi
 }
 
+# 检测系统版本
+detect_system_version() {
+    if [[ "$OS" == "Linux" ]]; then
+        if [ -f /etc/os-release ]; then
+            . /etc/os-release
+            OS_NAME=$NAME
+            OS_VERSION=$VERSION_ID
+            print_info "系统: $OS_NAME $OS_VERSION"
+        elif [ -f /etc/debian_version ]; then
+            OS_NAME="Debian"
+            OS_VERSION=$(cat /etc/debian_version)
+            print_info "系统: Debian $OS_VERSION"
+        elif [ -f /etc/redhat-release ]; then
+            OS_NAME=$(cat /etc/redhat-release)
+            OS_VERSION=""
+            print_info "系统: $OS_NAME"
+        fi
+    elif [[ "$OS" == "Darwin" ]]; then
+        OS_NAME="macOS"
+        OS_VERSION=$(sw_vers -productVersion)
+        print_info "系统: macOS $OS_VERSION"
+    fi
+}
+
 # 安装系统依赖
 install_dependencies() {
     print_info "安装编译工具和依赖..."
+    
+    # 检测系统版本
+    detect_system_version
     
     if [[ "$OS" == "Linux" ]]; then
         # 检测 Linux 发行版
@@ -316,12 +343,26 @@ install_dependencies() {
             print_info "安装编译工具..."
             sudo apt-get install -y build-essential python3 python3-dev
             
-            # 尝试安装 python3-distutils（旧版本需要）
-            sudo apt-get install -y python3-distutils 2>/dev/null || true
-            
-            # 安装 setuptools（新版本使用）
-            sudo apt-get install -y python3-pip 2>/dev/null || true
-            pip3 install setuptools 2>/dev/null || true
+            # 根据 Ubuntu 版本安装 Python 依赖
+            if [[ "$OS_NAME" == *"Ubuntu"* ]]; then
+                UBUNTU_VERSION=$(echo $OS_VERSION | cut -d. -f1)
+                print_info "Ubuntu 版本: $UBUNTU_VERSION"
+                
+                if [ "$UBUNTU_VERSION" -ge 22 ]; then
+                    # Ubuntu 22.04+ 使用 setuptools
+                    print_info "安装 Python setuptools (Ubuntu 22.04+)..."
+                    sudo apt-get install -y python3-pip python3-setuptools
+                else
+                    # Ubuntu 20.04 及以下使用 distutils
+                    print_info "安装 Python distutils (Ubuntu 20.04-)..."
+                    sudo apt-get install -y python3-distutils python3-pip
+                fi
+            else
+                # Debian 或其他，尝试两种方式
+                print_info "安装 Python 依赖..."
+                sudo apt-get install -y python3-distutils 2>/dev/null || \
+                sudo apt-get install -y python3-pip python3-setuptools
+            fi
             
             # 安装 Git 和 Node.js
             [ "$NEED_GIT" = true ] && sudo apt-get install -y git
@@ -331,14 +372,31 @@ install_dependencies() {
             # CentOS/RHEL
             print_info "检测到 CentOS/RHEL 系统"
             
+            # 检测版本
+            if [[ "$OS_NAME" == *"CentOS"* ]] || [[ "$OS_NAME" == *"Red Hat"* ]]; then
+                RHEL_VERSION=$(rpm -q --queryformat '%{VERSION}' centos-release 2>/dev/null || echo "8")
+                print_info "RHEL/CentOS 版本: $RHEL_VERSION"
+            fi
+            
             # 安装编译工具
             print_info "安装编译工具..."
-            sudo yum groupinstall -y "Development Tools"
-            sudo yum install -y python3 python3-devel
+            sudo yum groupinstall -y "Development Tools" 2>/dev/null || \
+            sudo dnf groupinstall -y "Development Tools"
+            
+            sudo yum install -y python3 python3-devel 2>/dev/null || \
+            sudo dnf install -y python3 python3-devel
+            
+            # 安装 pip
+            sudo yum install -y python3-pip 2>/dev/null || \
+            sudo dnf install -y python3-pip
             
             # 安装 Git 和 Node.js
-            [ "$NEED_GIT" = true ] && sudo yum install -y git
-            [ "$NEED_NODE" = true ] && sudo yum install -y nodejs npm
+            if [ "$NEED_GIT" = true ]; then
+                sudo yum install -y git 2>/dev/null || sudo dnf install -y git
+            fi
+            if [ "$NEED_NODE" = true ]; then
+                sudo yum install -y nodejs npm 2>/dev/null || sudo dnf install -y nodejs npm
+            fi
         fi
     elif [[ "$OS" == "Darwin" ]]; then
         # macOS
@@ -362,7 +420,7 @@ install_dependencies() {
             if [ -f /etc/debian_version ]; then
                 sudo apt-get install -y nginx
             elif [ -f /etc/redhat-release ]; then
-                sudo yum install -y nginx
+                sudo yum install -y nginx 2>/dev/null || sudo dnf install -y nginx
             fi
         elif [[ "$OS" == "Darwin" ]]; then
             brew install nginx
