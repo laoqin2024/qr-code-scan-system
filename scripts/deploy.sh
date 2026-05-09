@@ -314,7 +314,14 @@ install_dependencies() {
             
             # 安装编译工具
             print_info "安装编译工具..."
-            sudo apt-get install -y build-essential python3 python3-distutils python3-dev
+            sudo apt-get install -y build-essential python3 python3-dev
+            
+            # 尝试安装 python3-distutils（旧版本需要）
+            sudo apt-get install -y python3-distutils 2>/dev/null || true
+            
+            # 安装 setuptools（新版本使用）
+            sudo apt-get install -y python3-pip 2>/dev/null || true
+            pip3 install setuptools 2>/dev/null || true
             
             # 安装 Git 和 Node.js
             [ "$NEED_GIT" = true ] && sudo apt-get install -y git
