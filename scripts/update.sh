@@ -265,7 +265,7 @@ backup_database() {
     fi
     
     # 使用项目目录外的安全位置存储备份
-    # 优先级：/var/backups > /tmp > 用户家目录
+    # 优先级：/var/backups > 用户家目录 > /tmp
     if [ -d "/var/backups" ] && [ -w "/var/backups" ]; then
         BACKUP_BASE_DIR="/var/backups/scan-code"
     elif [ -n "$HOME" ] && [ -d "$HOME" ]; then
@@ -280,6 +280,7 @@ backup_database() {
     DB_BACKUP_FILE="$BACKUP_BASE_DIR/db.sqlite.backup_$TIMESTAMP"
     
     print_info "备份数据库到: $DB_BACKUP_FILE"
+    print_warning "备份位置在项目目录外，即使项目被删除，备份仍然安全"
     
     # 使用 cp 而不是 mv，确保原文件不被破坏
     if cp db.sqlite "$DB_BACKUP_FILE"; then
@@ -522,12 +523,13 @@ show_summary() {
     echo "  最新提交: $(git log -1 --oneline)"
     echo ""
     
-    if [ -n "$DB_BACKUP_FILE" ] && [ -f "$DB_BACKUP_FILE" ]; then
-        echo "💾 数据库备份:"
-        echo "  备份文件: $DB_BACKUP_FILE"
-        echo "  备份大小: $(du -h "$DB_BACKUP_FILE" | cut -f1)"
-        echo "  查看所有备份: ls -lh $(dirname "$DB_BACKUP_FILE")"
-        echo ""
+    if [ -d "$PROJECT_DIR/backups" ]; then
+        LATEST_BACKUP=$(ls -t "$PROJECT_DIR/backups"/db.sqlite.backup_* 2>/dev/null | head -1)
+        if [ -n "$LATEST_BACKUP" ]; then
+            echo "💾 数据库备份:"
+            echo "  最新备份: $LATEST_BACKUP"
+            echo ""
+        fi
     fi
     
     echo "🔧 常用命令:"
@@ -542,7 +544,7 @@ show_summary() {
     if [ -n "$DB_BACKUP_FILE" ]; then
         echo "⚠️  如遇问题:"
         echo "  1. 查看日志排查错误"
-        echo "  2. 恢复数据库备份: cp $DB_BACKUP_FILE $PROJECT_DIR/db.sqlite"
+        echo "  2. 恢复数据库备份: cp $DB_BACKUP_FILE db.sqlite"
         echo "  3. 回滚代码: git reset --hard <commit-hash>"
         echo ""
     fi
