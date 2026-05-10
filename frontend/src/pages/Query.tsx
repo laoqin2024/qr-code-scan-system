@@ -18,6 +18,7 @@ const Query: React.FC = () => {
   const [filterStartTime, setFilterStartTime] = useState('');
   const [filterEndTime, setFilterEndTime] = useState('');
   const [filterValid, setFilterValid] = useState<any>('');
+  const [filterCodeText, setFilterCodeText] = useState(''); // 新增：二维码搜索
   
   const [users, setUsers] = useState<any[]>([]);
 
@@ -70,7 +71,17 @@ const Query: React.FC = () => {
       if (filterValid !== '') params.is_valid = filterValid === 'true' ? 1 : 0;
 
       const res = await api.get('/scans', { params });
-      setScans(res.data);
+      
+      // 前端过滤：如果有二维码搜索条件，进行模糊匹配
+      let filteredScans = res.data;
+      if (filterCodeText.trim()) {
+        const searchText = filterCodeText.trim().toLowerCase();
+        filteredScans = res.data.filter((scan: ScanRecord) => 
+          scan.code_text.toLowerCase().includes(searchText)
+        );
+      }
+      
+      setScans(filteredScans);
     } catch (err: any) {
       setError(err.response?.data?.error || '查询失败');
     } finally {
@@ -86,7 +97,7 @@ const Query: React.FC = () => {
 
   useEffect(() => {
     fetchScans();
-  }, [filterCustomerId, filterProductId, filterUserId, filterStartTime, filterEndTime, filterValid]);
+  }, [filterCustomerId, filterProductId, filterUserId, filterStartTime, filterEndTime, filterValid, filterCodeText]);
 
   // 当客户改变时，重置产品选择
   useEffect(() => {
@@ -160,6 +171,18 @@ const Query: React.FC = () => {
           </div>
         </div>
         <div className="filter-row">
+          <div className="filter-item filter-item-wide">
+            <label>二维码搜索</label>
+            <input
+              type="text"
+              placeholder="输入二维码内容进行搜索（支持模糊匹配）"
+              value={filterCodeText}
+              onChange={e => setFilterCodeText(e.target.value)}
+              className="code-search-input"
+            />
+          </div>
+        </div>
+        <div className="filter-row">
           <div className="filter-item">
             <label>起始时间</label>
             <input
@@ -206,7 +229,9 @@ const Query: React.FC = () => {
                 <tr key={s.id} className={s.is_valid ? '' : 'invalid-row'}>
                   <td>{s.customer_name || getCustomerName(s.customer_id)}</td>
                   <td>{s.product_model || getProductModel(s.product_id)}</td>
-                  <td className="code-text">{s.code_text}</td>
+                  <td className="code-text" title={s.code_text}>
+                    <div className="code-text-wrapper">{s.code_text}</div>
+                  </td>
                   <td>{s.code_length}</td>
                   <td>
                     <div className="user-info-cell">
