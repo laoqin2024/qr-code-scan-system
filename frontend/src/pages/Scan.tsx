@@ -113,12 +113,43 @@ const Scan: React.FC = () => {
       return;
     }
 
+    // 检查是否重复扫码（在今日记录中查找相同的二维码）
+    const trimmedCode = codeText.trim();
+    const isDuplicate = todayScans.some(scan => 
+      scan.code_text === trimmedCode && 
+      scan.customer_id === customerId && 
+      scan.product_id === productId
+    );
+
+    if (isDuplicate) {
+      // 重复扫码：显示警告信息
+      setStatusMessage('⚠️ 重复扫码！该二维码今日已扫描过');
+      setStatusType('error');
+      
+      // 清空输入框
+      setCodeText('');
+      setNotes('');
+      
+      // 聚焦输入框
+      setTimeout(() => {
+        codeInputRef.current?.focus();
+      }, 100);
+      
+      // 3秒后清除警告信息
+      setTimeout(() => {
+        setStatusMessage('');
+        setStatusType('');
+      }, 3000);
+      
+      return; // 不保存，直接返回
+    }
+
     setLoading(true);
     try {
       const res = await api.post('/scans', {
         customer_id: customerId,
         product_id: productId,
-        code_text: codeText.trim(),
+        code_text: trimmedCode,
         notes
       });
       
