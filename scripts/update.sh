@@ -4,6 +4,12 @@
 # 用于已部署项目的更新升级
 
 set -e  # 遇到错误立即退出
+set -o pipefail  # 管道命令中任何一个失败都会导致整个管道失败
+
+# 全局变量
+DB_BACKUP_FILE=""
+DB_TEMP_MOVED=false
+STASHED=false
 
 # 颜色定义
 RED='\033[0;31m'
@@ -97,7 +103,94 @@ main() {
     
     # 完成
     print_header "🎉 更新完成！"
+    
+    # 最终验证
+    print_info "执行最终验证..."
+    echo ""
+    
+    # 验证数据库
+    if [ -f "$PROJECT_DIR/db.sqlite" ]; then
+        if sqlite3 "$PROJECT_DIR/db.sqlite" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+            print_success "✓ 数据库完整性验证通过"
+        else
+            print_error "✗ 数据库验证失败！"
+            print_warning "建议恢复备份: cp $DB_BACKUP_FILE db.sqlite"
+        fi
+    else
+        print_error "✗ 数据库文件不存在！"
+    fi
+    
+    # 验证前端构建
+    if [ -d "$PROJECT_DIR/frontend/dist" ] && [ -f "$PROJECT_DIR/frontend/dist/index.html" ]; then
+        print_success "✓ 前端构建文件存在"
+    else
+        print_error "✗ 前端构建文件缺失！"
+    fi
+    
+    # 验证后端服务
+    sleep 2
+    if pm2 list | grep -q "scan-code-backend.*online"; then
+        print_success "✓ 后端服务运行正常"
+    else
+        print_error "✗ 后端服务未正常运行！"
+    fi
+    
+    echo ""
     show_summary
+}
+
+# 错误处理函数
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    
+    print_error "更新过程中发生错误（退出码: $exit_code，行号: $line_number）"
+    
+    # 如果有数据库备份，提供恢复选项
+    if [ -n "$DB_BACKUP_FILE" ] && [ -f "$DB_BACKUP_FILE" ]; then
+        echo ""
+        print_warning "检测到数据库备份文件"
+        read -p "是否恢复数据库备份？(y/n) [默认: y]: " RESTORE_DB
+        RESTORE_DB=${RESTORE_DB:-y}
+        
+        if [[ $RESTORE_DB =~ ^[Yy]$ ]]; then
+            print_info "恢复数据库..."
+            cd "$PROJECT_DIR"
+            cp "$DB_BACKUP_FILE" db.sqlite
+            print_success "数据库已恢复"
+        fi
+    fi
+    
+    # 如果数据库在临时位置，恢复它
+    if [ "$DB_TEMP_MOVED" = true ] && [ -f "/tmp/db.sqlite.updating.$$" ]; then
+        print_info "恢复临时移动的数据库..."
+        cd "$PROJECT_DIR"
+        mv /tmp/db.sqlite.updating.$$ db.sqlite
+        print_success "数据库已恢复"
+    fi
+    
+    echo ""
+    print_error "更新失败！请检查错误信息"
+    echo ""
+    echo "📋 故障排除："
+    echo "  1. 查看完整日志"
+    echo "  2. 检查网络连接"
+    echo "  3. 检查磁盘空间: df -h"
+    echo "  4. 查看服务状态: pm2 list"
+    echo "  5. 查看服务日志: pm2 logs"
+    echo ""
+    echo "🔄 恢复选项："
+    if [ -n "$DB_BACKUP_FILE" ]; then
+        echo "  恢复数据库: cp $DB_BACKUP_FILE db.sqlite"
+    fi
+    echo "  查看备份列表: ls -lh backups/"
+    echo ""
+    
+    exit 1
+}
+
+# 设置错误捕获
+trap 'handle_error $LINENO' ERR
 }
 
 # 检测项目目录
@@ -153,23 +246,62 @@ backup_database() {
     
     if [ ! -f "db.sqlite" ]; then
         print_warning "数据库文件不存在，跳过备份"
+        DB_BACKUP_FILE=""
         return
+    fi
+    
+    # 检查数据库文件完整性
+    print_info "检查数据库完整性..."
+    if ! sqlite3 db.sqlite "PRAGMA integrity_check;" > /dev/null 2>&1; then
+        print_error "数据库文件已损坏！"
+        print_warning "建议从备份恢复或重新初始化"
+        read -p "是否继续更新？(y/n) [默认: n]: " CONTINUE_WITH_BAD_DB
+        CONTINUE_WITH_BAD_DB=${CONTINUE_WITH_BAD_DB:-n}
+        if [[ ! $CONTINUE_WITH_BAD_DB =~ ^[Yy]$ ]]; then
+            print_error "更新已取消"
+            exit 1
+        fi
+    else
+        print_success "数据库完整性检查通过"
     fi
     
     BACKUP_DIR="backups"
     mkdir -p "$BACKUP_DIR"
     
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    BACKUP_FILE="$BACKUP_DIR/db.sqlite.backup_$TIMESTAMP"
+    DB_BACKUP_FILE="$BACKUP_DIR/db.sqlite.backup_$TIMESTAMP"
     
-    print_info "备份数据库到: $BACKUP_FILE"
-    cp db.sqlite "$BACKUP_FILE"
+    print_info "备份数据库到: $DB_BACKUP_FILE"
     
-    print_success "数据库备份完成"
+    # 使用 cp 而不是 mv，确保原文件不被破坏
+    if cp db.sqlite "$DB_BACKUP_FILE"; then
+        print_success "数据库备份完成"
+        
+        # 验证备份文件
+        if sqlite3 "$DB_BACKUP_FILE" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+            print_success "备份文件验证通过"
+        else
+            print_error "备份文件验证失败！"
+            rm -f "$DB_BACKUP_FILE"
+            print_error "更新已取消"
+            exit 1
+        fi
+    else
+        print_error "数据库备份失败！"
+        print_error "更新已取消"
+        exit 1
+    fi
     
     # 保留最近10个备份
     print_info "清理旧备份（保留最近10个）..."
     ls -t "$BACKUP_DIR"/db.sqlite.backup_* 2>/dev/null | tail -n +11 | xargs -r rm
+    
+    echo ""
+    print_info "💾 备份信息："
+    echo "  备份文件: $DB_BACKUP_FILE"
+    echo "  备份大小: $(du -h "$DB_BACKUP_FILE" | cut -f1)"
+    echo "  恢复命令: cp $DB_BACKUP_FILE db.sqlite"
+    echo ""
 }
 
 # 拉取最新代码
@@ -193,6 +325,14 @@ pull_code() {
         fi
     fi
     
+    # 临时移动数据库文件到安全位置
+    print_info "保护数据库文件..."
+    if [ -f "db.sqlite" ]; then
+        mv db.sqlite /tmp/db.sqlite.updating.$$
+        DB_TEMP_MOVED=true
+        print_success "数据库已移至安全位置"
+    fi
+    
     # 拉取最新代码
     print_info "拉取最新代码..."
     
@@ -201,9 +341,25 @@ pull_code() {
     print_info "当前分支: $CURRENT_BRANCH"
     
     # 拉取代码
-    git pull origin "$CURRENT_BRANCH"
+    if git pull origin "$CURRENT_BRANCH"; then
+        print_success "代码更新完成"
+    else
+        print_error "代码拉取失败！"
+        
+        # 恢复数据库
+        if [ "$DB_TEMP_MOVED" = true ]; then
+            mv /tmp/db.sqlite.updating.$$ db.sqlite
+            print_info "数据库已恢复"
+        fi
+        
+        exit 1
+    fi
     
-    print_success "代码更新完成"
+    # 恢复数据库文件
+    if [ "$DB_TEMP_MOVED" = true ]; then
+        mv /tmp/db.sqlite.updating.$$ db.sqlite
+        print_success "数据库已恢复到项目目录"
+    fi
     
     # 如果之前暂存了更改，询问是否恢复
     if [ "$STASHED" = true ]; then
@@ -375,16 +531,15 @@ show_summary() {
     echo "  查看 Git 日志: git log --oneline -10"
     echo "  回滚到上一版本: git reset --hard HEAD~1"
     echo ""
-    echo "⚠️  如遇问题:"
-    echo "  1. 查看日志排查错误"
-    echo "  2. 恢复数据库备份: cp $LATEST_BACKUP db.sqlite"
-    echo "  3. 回滚代码: git reset --hard <commit-hash>"
-    echo ""
+    if [ -n "$DB_BACKUP_FILE" ]; then
+        echo "⚠️  如遇问题:"
+        echo "  1. 查看日志排查错误"
+        echo "  2. 恢复数据库备份: cp $DB_BACKUP_FILE db.sqlite"
+        echo "  3. 回滚代码: git reset --hard <commit-hash>"
+        echo ""
+    fi
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
-
-# 错误处理
-trap 'print_error "更新过程中发生错误"; exit 1' ERR
 
 # 运行主函数
 main
