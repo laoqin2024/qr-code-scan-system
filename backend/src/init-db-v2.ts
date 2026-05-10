@@ -26,6 +26,16 @@ try {
   db.exec(schema);
   console.log('✅ 表结构创建完成');
   
+  // 检查是否已有数据
+  const existingUsers = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
+  
+  if (existingUsers.count > 0) {
+    console.log('\n⚠️  数据库已包含数据，跳过初始化');
+    console.log(`   当前用户数: ${existingUsers.count}`);
+    console.log('\n💡 如需重新初始化，请先删除数据库文件: rm db.sqlite');
+    process.exit(0);
+  }
+  
   console.log('\n👤 创建初始用户...');
   
   // 创建超级管理员

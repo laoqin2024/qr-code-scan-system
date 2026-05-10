@@ -209,8 +209,22 @@ collect_config() {
     
     # 域名或IP
     echo ""
-    read -p "请输入服务器域名或IP [默认: localhost]: " SERVER_HOST
-    SERVER_HOST=${SERVER_HOST:-localhost}
+    echo "配置服务器地址（用于 Nginx 的 server_name）："
+    echo "  - 如果有域名，填写域名（如 example.com）"
+    echo "  - 如果没有域名，填写服务器 IP（如 192.168.8.91）"
+    echo "  - 填写 _ 表示匹配所有请求（推荐）"
+    echo "  ⚠️  注意：不要填写 0.0.0.0（这不是有效的 server_name）"
+    echo ""
+    read -p "请输入服务器域名或IP [默认: _]: " SERVER_HOST
+    SERVER_HOST=${SERVER_HOST:-_}
+    
+    # 验证输入
+    if [ "$SERVER_HOST" = "0.0.0.0" ]; then
+        print_warning "检测到 0.0.0.0，这不是有效的 server_name"
+        print_info "自动修正为 _ (匹配所有请求)"
+        SERVER_HOST="_"
+    fi
+    
     print_info "服务器地址: $SERVER_HOST"
     
     # JWT Secret
@@ -522,12 +536,42 @@ build_frontend() {
 
 # 初始化数据库
 init_database() {
-    cd "$INSTALL_DIR/backend"
+    cd "$INSTALL_DIR"
     
-    print_info "初始化数据库..."
-    npm run init-db
+    # 检查数据库是否已存在
+    if [ -f "$INSTALL_DIR/db.sqlite" ]; then
+        print_warning "数据库文件已存在"
+        read -p "是否重新初始化数据库？(y/n) [默认: n]: " REINIT_DB
+        REINIT_DB=${REINIT_DB:-n}
+        
+        if [ "$REINIT_DB" = "y" ]; then
+            print_info "删除旧数据库..."
+            rm -f "$INSTALL_DIR/db.sqlite"
+        else
+            print_info "跳过数据库初始化，使用现有数据库"
+            return
+        fi
+    fi
     
-    print_success "数据库初始化完成"
+    # 优先使用预初始化的数据库文件
+    if [ -f "$INSTALL_DIR/db.sqlite.init" ]; then
+        print_info "使用预初始化的数据库文件..."
+        cp "$INSTALL_DIR/db.sqlite.init" "$INSTALL_DIR/db.sqlite"
+        print_success "数据库初始化完成（使用预置文件）"
+    else
+        print_info "运行数据库初始化脚本..."
+        cd "$INSTALL_DIR/backend"
+        npm run init-db
+        
+        if [ $? -eq 0 ]; then
+            print_success "数据库初始化完成"
+        else
+            print_error "数据库初始化失败"
+            print_info "提示: 可以手动创建 db.sqlite.init 文件作为初始数据库模板"
+            return 1
+        fi
+    fi
+    
     print_info "默认账号:"
     echo "  超级管理员: admin / admin123"
     echo "  客户管理员: test / test123"
@@ -542,7 +586,25 @@ configure_nginx() {
     
     print_info "生成 Nginx 配置..."
     
-    NGINX_CONF="/etc/nginx/sites-available/scan-code"
+    # 检测 Nginx 配置目录
+    if [ -d "/etc/nginx/sites-available" ]; then
+        # Debian/Ubuntu 风格
+        NGINX_CONF="/etc/nginx/sites-available/scan-code"
+        NGINX_ENABLED="/etc/nginx/sites-enabled/scan-code"
+        USE_SITES_AVAILABLE=true
+        print_info "检测到 Debian/Ubuntu 系统"
+    elif [ -d "/etc/nginx/conf.d" ]; then
+        # CentOS/RHEL 风格
+        NGINX_CONF="/etc/nginx/conf.d/scan-code.conf"
+        USE_SITES_AVAILABLE=false
+        print_info "检测到 CentOS/RHEL 系统"
+    else
+        print_error "无法确定 Nginx 配置目录"
+        print_info "请手动配置 Nginx"
+        return 1
+    fi
+    
+    print_info "配置文件路径: $NGINX_CONF"
     
     sudo tee "$NGINX_CONF" > /dev/null << EOF
 server {
@@ -579,20 +641,31 @@ server {
 }
 EOF
     
-    # 创建软链接
-    if [ -d "/etc/nginx/sites-enabled" ]; then
-        sudo ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/
+    # 创建软链接（仅 Debian/Ubuntu）
+    if [ "$USE_SITES_AVAILABLE" = true ]; then
+        print_info "创建软链接到 sites-enabled..."
+        sudo ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
     fi
     
     # 测试配置
     print_info "测试 Nginx 配置..."
-    sudo nginx -t
+    if sudo nginx -t; then
+        print_success "Nginx 配置测试通过"
+    else
+        print_error "Nginx 配置测试失败"
+        return 1
+    fi
     
     # 重启 Nginx
     print_info "重启 Nginx..."
-    sudo systemctl restart nginx || sudo service nginx restart
+    sudo systemctl restart nginx 2>/dev/null || sudo service nginx restart
     
-    print_success "Nginx 配置完成"
+    if [ $? -eq 0 ]; then
+        print_success "Nginx 配置完成"
+    else
+        print_error "Nginx 重启失败"
+        return 1
+    fi
 }
 
 # 启动服务

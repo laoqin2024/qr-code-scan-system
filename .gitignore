@@ -33,8 +33,11 @@ logs/
 .cache/
 
 # 数据库（可选，根据需要决定是否提交）
-# db.sqlite
+# db.sqlite - 运行时数据库（不提交）
+db.sqlite
 db.sqlite.backup*
+# db.sqlite.init - 初始化模板（提交到仓库）
+!db.sqlite.init
 
 # 测试覆盖率
 coverage/
