@@ -83,16 +83,16 @@ router.post('/', requireOperator, async (req: AuthRequest, res) => {
       error_reason = '长度超出';
     }
     
-    // 插入扫码记录
+    // 插入扫码记录（使用本地时间 UTC+8）
     const result = db.prepare(`
       INSERT INTO scans (customer_id, product_id, user_id, code_text, code_length, is_valid, error_reason, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(customer_id, product_id, user.id, code_text, code_length, is_valid, error_reason, notes || null);
     
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'scan', 'scan', ?, ?, datetime('now'))
+      VALUES (?, 'scan', 'scan', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, result.lastInsertRowid, JSON.stringify({ product_id, is_valid }));
     
     res.json({ 
@@ -304,7 +304,7 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'delete', 'scan', ?, ?, datetime('now'))
+      VALUES (?, 'delete', 'scan', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, scanId, JSON.stringify({ scan_id: scanId }));
     
     res.json({ message: '删除成功' });
@@ -354,7 +354,7 @@ router.post('/batch-delete-invalid', requireAuth, async (req: AuthRequest, res) 
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'batch_delete_invalid_scans', 'scan', NULL, ?, datetime('now'))
+      VALUES (?, 'batch_delete_invalid_scans', 'scan', NULL, ?, datetime('now', 'localtime'))
     `).run(user.id, JSON.stringify({ 
       deleted_count: result.changes,
       filters: { customer_id, product_id, start_time, end_time }
@@ -484,7 +484,7 @@ router.post('/cleanup-test-data', requireAuth, async (req: AuthRequest, res) => 
       // 记录审计日志
       db.prepare(`
         INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-        VALUES (?, 'cleanup_test_data', 'system', NULL, ?, datetime('now'))
+        VALUES (?, 'cleanup_test_data', 'system', NULL, ?, datetime('now', 'localtime'))
       `).run(user.id, JSON.stringify({ 
         deleted_scans: deletedScans,
         deleted_products: deletedProducts,
@@ -582,7 +582,7 @@ router.post('/initialize-system', requireAuth, async (req: AuthRequest, res) => 
       // 记录审计日志
       db.prepare(`
         INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-        VALUES (?, 'initialize_system', 'system', NULL, ?, datetime('now'))
+        VALUES (?, 'initialize_system', 'system', NULL, ?, datetime('now', 'localtime'))
       `).run(user.id, JSON.stringify({ 
         deleted_scans: allScans.count,
         deleted_products: allProducts.count,

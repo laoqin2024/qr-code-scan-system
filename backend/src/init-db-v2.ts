@@ -42,7 +42,7 @@ try {
   const adminPassword = await bcrypt.hash('admin123', 10);
   db.prepare(`
     INSERT INTO users (username, password_hash, role, is_active, created_at, display_name)
-    VALUES (?, ?, 'super_admin', 1, datetime('now'), ?)
+    VALUES (?, ?, 'super_admin', 1, datetime('now', 'localtime'), ?)
   `).run('admin', adminPassword, '系统管理员');
   console.log('  ✓ 超级管理员: admin / admin123');
   
@@ -50,7 +50,7 @@ try {
   const testPassword = await bcrypt.hash('test123', 10);
   db.prepare(`
     INSERT INTO users (username, password_hash, role, is_active, created_at, display_name)
-    VALUES (?, ?, 'customer_admin', 1, datetime('now'), ?)
+    VALUES (?, ?, 'customer_admin', 1, datetime('now', 'localtime'), ?)
   `).run('test', testPassword, '测试管理员');
   console.log('  ✓ 客户管理员: test / test123 (测试账号)');
   
@@ -58,13 +58,13 @@ try {
   console.log('\n🏢 创建示例数据...');
   const customer1 = db.prepare(`
     INSERT INTO customers (name, expected_length, description, created_at)
-    VALUES (?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, datetime('now', 'localtime'))
   `).run('富士康', 20, '电子产品制造');
   console.log('  ✓ 客户: 富士康');
   
   const customer2 = db.prepare(`
     INSERT INTO customers (name, expected_length, description, created_at)
-    VALUES (?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, datetime('now', 'localtime'))
   `).run('比亚迪', 18, '新能源汽车');
   console.log('  ✓ 客户: 比亚迪');
   
@@ -72,32 +72,32 @@ try {
   const customerAdminPassword = await bcrypt.hash('manager123', 10);
   const customerAdmin1 = db.prepare(`
     INSERT INTO users (username, password_hash, role, customer_id, is_active, created_at)
-    VALUES (?, ?, 'customer_admin', ?, 1, datetime('now'))
+    VALUES (?, ?, 'customer_admin', ?, 1, datetime('now', 'localtime'))
   `).run('foxconn_manager', customerAdminPassword, customer1.lastInsertRowid);
   console.log('  ✓ 客户管理员: foxconn_manager / manager123 (富士康)');
   
   const customerAdmin2 = db.prepare(`
     INSERT INTO users (username, password_hash, role, customer_id, is_active, created_at)
-    VALUES (?, ?, 'customer_admin', ?, 1, datetime('now'))
+    VALUES (?, ?, 'customer_admin', ?, 1, datetime('now', 'localtime'))
   `).run('byd_manager', customerAdminPassword, customer2.lastInsertRowid);
   console.log('  ✓ 客户管理员: byd_manager / manager123 (比亚迪)');
   
   // 创建产品
   const product1 = db.prepare(`
     INSERT INTO products (model, customer_id, description, created_at)
-    VALUES (?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, datetime('now', 'localtime'))
   `).run('iPhone 15 Pro', customer1.lastInsertRowid, '苹果手机');
   console.log('  ✓ 产品: iPhone 15 Pro');
   
   const product2 = db.prepare(`
     INSERT INTO products (model, customer_id, description, created_at)
-    VALUES (?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, datetime('now', 'localtime'))
   `).run('iPad Air', customer1.lastInsertRowid, '苹果平板');
   console.log('  ✓ 产品: iPad Air');
   
   const product3 = db.prepare(`
     INSERT INTO products (model, customer_id, description, created_at)
-    VALUES (?, ?, ?, datetime('now'))
+    VALUES (?, ?, ?, datetime('now', 'localtime'))
   `).run('海豹电池模组', customer2.lastInsertRowid, '动力电池');
   console.log('  ✓ 产品: 海豹电池模组');
   
@@ -105,13 +105,13 @@ try {
   const operatorPassword = await bcrypt.hash('operator123', 10);
   const operator1 = db.prepare(`
     INSERT INTO users (username, password_hash, role, customer_id, is_active, created_at)
-    VALUES (?, ?, 'operator', ?, 1, datetime('now'))
+    VALUES (?, ?, 'operator', ?, 1, datetime('now', 'localtime'))
   `).run('operator_zhang', operatorPassword, customer1.lastInsertRowid);
   console.log('  ✓ 操作员: operator_zhang / operator123 (富士康)');
   
   const operator2 = db.prepare(`
     INSERT INTO users (username, password_hash, role, customer_id, is_active, created_at)
-    VALUES (?, ?, 'operator', ?, 1, datetime('now'))
+    VALUES (?, ?, 'operator', ?, 1, datetime('now', 'localtime'))
   `).run('operator_li', operatorPassword, customer2.lastInsertRowid);
   console.log('  ✓ 操作员: operator_li / operator123 (比亚迪)');
   
@@ -119,19 +119,19 @@ try {
   console.log('\n🔑 配置权限...');
   db.prepare(`
     INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-    VALUES (?, ?, 1, 1, datetime('now'))
+    VALUES (?, ?, 1, 1, datetime('now', 'localtime'))
   `).run(operator1.lastInsertRowid, product1.lastInsertRowid);
   console.log('  ✓ operator_zhang 可以扫描 iPhone 15 Pro');
   
   db.prepare(`
     INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-    VALUES (?, ?, 1, 1, datetime('now'))
+    VALUES (?, ?, 1, 1, datetime('now', 'localtime'))
   `).run(operator1.lastInsertRowid, product2.lastInsertRowid);
   console.log('  ✓ operator_zhang 可以扫描 iPad Air');
   
   db.prepare(`
     INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-    VALUES (?, ?, 1, 1, datetime('now'))
+    VALUES (?, ?, 1, 1, datetime('now', 'localtime'))
   `).run(operator2.lastInsertRowid, product3.lastInsertRowid);
   console.log('  ✓ operator_li 可以扫描 海豹电池模组');
   
@@ -139,13 +139,13 @@ try {
   const viewerPassword = await bcrypt.hash('viewer123', 10);
   const viewer1 = db.prepare(`
     INSERT INTO users (username, password_hash, role, customer_id, is_active, created_at)
-    VALUES (?, ?, 'viewer', ?, 1, datetime('now'))
+    VALUES (?, ?, 'viewer', ?, 1, datetime('now', 'localtime'))
   `).run('viewer_wang', viewerPassword, customer1.lastInsertRowid);
   console.log('  ✓ 查看者: viewer_wang / viewer123 (富士康)');
   
   db.prepare(`
     INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-    VALUES (?, ?, 0, 1, datetime('now'))
+    VALUES (?, ?, 0, 1, datetime('now', 'localtime'))
   `).run(viewer1.lastInsertRowid, product1.lastInsertRowid);
   console.log('  ✓ viewer_wang 可以查看 iPhone 15 Pro 记录');
   

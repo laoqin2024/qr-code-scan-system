@@ -86,7 +86,7 @@ router.post('/users/:id/permissions/products', requireCustomerAdmin, async (req:
     // 插入或更新权限
     db.prepare(`
       INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
       ON CONFLICT(user_id, product_id) DO UPDATE SET
         can_scan = excluded.can_scan,
         can_view = excluded.can_view
@@ -95,7 +95,7 @@ router.post('/users/:id/permissions/products', requireCustomerAdmin, async (req:
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'grant_permission', 'permission', ?, ?, datetime('now'))
+      VALUES (?, 'grant_permission', 'permission', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, userId, JSON.stringify({ product_id, can_scan, can_view }));
     
     res.json({ message: '授权成功' });
@@ -133,7 +133,7 @@ router.post('/users/:id/permissions/products/batch', requireCustomerAdmin, async
     // 批量插入
     const stmt = db.prepare(`
       INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
       ON CONFLICT(user_id, product_id) DO UPDATE SET
         can_scan = excluded.can_scan,
         can_view = excluded.can_view
@@ -152,7 +152,7 @@ router.post('/users/:id/permissions/products/batch', requireCustomerAdmin, async
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'grant_permission_batch', 'permission', ?, ?, datetime('now'))
+      VALUES (?, 'grant_permission_batch', 'permission', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, userId, JSON.stringify({ product_ids, can_scan, can_view, successCount }));
     
     res.json({ message: `批量授权成功，共授权 ${successCount} 个产品` });
@@ -208,7 +208,7 @@ router.post('/users/:id/permissions/customers/:customerId/products', requireCust
     // 批量授权
     const stmt = db.prepare(`
       INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
       ON CONFLICT(user_id, product_id) DO UPDATE SET
         can_scan = excluded.can_scan,
         can_view = excluded.can_view
@@ -221,7 +221,7 @@ router.post('/users/:id/permissions/customers/:customerId/products', requireCust
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'grant_customer_products', 'permission', ?, ?, datetime('now'))
+      VALUES (?, 'grant_customer_products', 'permission', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, userId, JSON.stringify({ customer_id: customerId, product_count: products.length, can_scan, can_view }));
     
     res.json({ message: `成功授权 ${products.length} 个产品` });
@@ -258,7 +258,7 @@ router.delete('/users/:id/permissions/products/:productId', requireCustomerAdmin
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'revoke_permission', 'permission', ?, ?, datetime('now'))
+      VALUES (?, 'revoke_permission', 'permission', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, userId, JSON.stringify({ product_id: productId }));
     
     res.json({ message: '撤销成功' });

@@ -41,7 +41,7 @@ router.post('/login', async (req, res) => {
     const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, details, ip_address, created_at)
-      VALUES (?, 'login', 'auth', ?, ?, datetime('now'))
+      VALUES (?, 'login', 'auth', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, JSON.stringify({ username }), ipAddress);
     
     // 生成 JWT token
@@ -122,7 +122,7 @@ router.post('/change-password', requireAuth, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, details, created_at)
-      VALUES (?, 'change_password', 'auth', ?, datetime('now'))
+      VALUES (?, 'change_password', 'auth', ?, datetime('now', 'localtime'))
     `).run(user.id, JSON.stringify({ username: user.username }));
     
     res.json({ message: '密码修改成功' });
@@ -140,7 +140,7 @@ router.post('/logout', requireAuth, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, details, created_at)
-      VALUES (?, 'logout', 'auth', ?, datetime('now'))
+      VALUES (?, 'logout', 'auth', ?, datetime('now', 'localtime'))
     `).run(user.id, JSON.stringify({ username: user.username }));
     
     res.json({ message: '登出成功' });

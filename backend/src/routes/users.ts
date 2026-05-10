@@ -44,7 +44,7 @@ router.put('/me/password', requireAuth, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'change_password', 'user', ?, ?, datetime('now'))
+      VALUES (?, 'change_password', 'user', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, user.id, JSON.stringify({ username: user.username }));
     
     res.json({ message: '密码修改成功，请重新登录' });
@@ -165,7 +165,7 @@ router.post('/', requireSuperAdmin, async (req: AuthRequest, res) => {
     const db = getDb();
     const result = db.prepare(`
       INSERT INTO users (username, password_hash, display_name, role, customer_id, is_active, created_at, created_by)
-      VALUES (?, ?, ?, ?, ?, 1, datetime('now'), ?)
+      VALUES (?, ?, ?, ?, ?, 1, datetime('now', 'localtime'), ?)
     `).run(username, password_hash, display_name, role, finalCustomerId || null, user.id);
     
     const newUserId = result.lastInsertRowid as number;
@@ -197,7 +197,7 @@ router.post('/', requireSuperAdmin, async (req: AuthRequest, res) => {
       if (products.length > 0) {
         const stmt = db.prepare(`
           INSERT INTO user_product_permissions (user_id, product_id, can_scan, can_view, created_at)
-          VALUES (?, ?, ?, ?, datetime('now'))
+          VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
         `);
         
         const canScan = role === 'operator' ? 1 : 0;
@@ -208,7 +208,7 @@ router.post('/', requireSuperAdmin, async (req: AuthRequest, res) => {
         // 记录审计日志
         db.prepare(`
           INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-          VALUES (?, 'auto_grant_permissions', 'permission', ?, ?, datetime('now'))
+          VALUES (?, 'auto_grant_permissions', 'permission', ?, ?, datetime('now', 'localtime'))
         `).run(user.id, newUserId, JSON.stringify({ 
           product_count: products.length,
           role,
@@ -220,7 +220,7 @@ router.post('/', requireSuperAdmin, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'create', 'user', ?, ?, datetime('now'))
+      VALUES (?, 'create', 'user', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, newUserId, JSON.stringify({ username, role }));
     
     res.json({ 
@@ -302,7 +302,7 @@ router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'update', 'user', ?, ?, datetime('now'))
+      VALUES (?, 'update', 'user', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, userId, JSON.stringify(req.body));
     
     res.json({ message: '更新成功' });
@@ -384,7 +384,7 @@ router.delete('/:id', requireAuth, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'delete', 'user', ?, ?, datetime('now'))
+      VALUES (?, 'delete', 'user', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, userId, JSON.stringify({ username: targetUser.username }));
     
     res.json({ message: '删除成功' });

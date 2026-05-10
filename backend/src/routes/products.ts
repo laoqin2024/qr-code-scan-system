@@ -133,13 +133,13 @@ router.post('/', requireCustomerAdmin, async (req: AuthRequest, res) => {
     
     const result = db.prepare(`
       INSERT INTO products (model, customer_id, description, created_by, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(model, customer_id, description || null, user.id);
     
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'create', 'product', ?, ?, datetime('now'))
+      VALUES (?, 'create', 'product', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, result.lastInsertRowid, JSON.stringify({ model, customer_id }));
     
     res.json({ id: result.lastInsertRowid });
@@ -190,7 +190,7 @@ router.put('/:id', requireCustomerAdmin, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'update', 'product', ?, ?, datetime('now'))
+      VALUES (?, 'update', 'product', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, productId, JSON.stringify(req.body));
     
     res.json({ success: true });
@@ -222,7 +222,7 @@ router.delete('/:id', requireCustomerAdmin, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'delete', 'product', ?, ?, datetime('now'))
+      VALUES (?, 'delete', 'product', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, productId, JSON.stringify({ id: productId, model: product.model }));
     
     res.json({ success: true });

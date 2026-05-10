@@ -106,13 +106,13 @@ router.post('/', requireCustomerAdmin, async (req: AuthRequest, res) => {
     const db = getDb();
     const result = db.prepare(`
       INSERT INTO customers (name, expected_length, description, created_by, created_at)
-      VALUES (?, ?, ?, ?, datetime('now'))
+      VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(name, expected_length, description || null, user.id);
     
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'create', 'customer', ?, ?, datetime('now'))
+      VALUES (?, 'create', 'customer', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, result.lastInsertRowid, JSON.stringify({ name, expected_length }));
     
     res.json({ id: result.lastInsertRowid });
@@ -168,7 +168,7 @@ router.put('/:id', requireCustomerAdmin, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'update', 'customer', ?, ?, datetime('now'))
+      VALUES (?, 'update', 'customer', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, customerId, JSON.stringify(req.body));
     
     res.json({ success: true });
@@ -206,7 +206,7 @@ router.delete('/:id', requireCustomerAdmin, async (req: AuthRequest, res) => {
     // 记录审计日志
     db.prepare(`
       INSERT INTO audit_logs (user_id, action, resource_type, resource_id, details, created_at)
-      VALUES (?, 'delete', 'customer', ?, ?, datetime('now'))
+      VALUES (?, 'delete', 'customer', ?, ?, datetime('now', 'localtime'))
     `).run(user.id, customerId, JSON.stringify({ id: customerId }));
     
     res.json({ success: true });
