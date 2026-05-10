@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Navbar from '../components/Navbar';
+import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../api';
 import { Customer, Product, ScanRecord } from '../types';
 import '../styles/Scan.css';
@@ -26,6 +27,12 @@ const Scan: React.FC = () => {
   const [lastInputTime, setLastInputTime] = useState<number>(0);
   const codeInputRef = useRef<HTMLTextAreaElement>(null);
   const autoSubmitTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 确认对话框状态
+  const [showDialog, setShowDialog] = useState(false);
+  const [dialogType, setDialogType] = useState<'duplicate' | 'error'>('error');
+  const [dialogTitle, setDialogTitle] = useState('');
+  const [dialogMessage, setDialogMessage] = useState('');
 
   const fetchCustomers = async () => {
     try {
@@ -123,41 +130,31 @@ const Scan: React.FC = () => {
     );
 
     if (isDuplicate) {
-      // 重复扫码：显示确认对话框
-      const confirmed = window.confirm(
-        '⚠️ 重复扫码警告\n\n' +
-        '该二维码今日已扫描过！\n' +
-        `二维码: ${trimmedCode}\n` +
+      // 重复扫码：显示自定义对话框
+      setDialogType('duplicate');
+      setDialogTitle('重复扫码警告');
+      setDialogMessage(
+        `该二维码今日已扫描过！\n\n` +
+        `二维码内容:\n${trimmedCode}\n\n` +
         `客户: ${currentCustomer?.name}\n` +
         `产品: ${products.find(p => p.id === productId)?.model}\n\n` +
-        '是否确认继续录入？'
+        `此数据不会被保存，请继续扫描下一个二维码。`
       );
-      
-      if (!confirmed) {
-        // 用户取消：清空输入框，聚焦
-        setCodeText('');
-        setNotes('');
-        setTimeout(() => {
-          codeInputRef.current?.focus();
-        }, 100);
-        return; // 不保存，直接返回
-      }
-      // 用户确认：继续执行保存逻辑
+      setShowDialog(true);
+      return; // 不保存，等待用户点击确定
     }
 
     // 检查长度是否匹配
     if (!isValid) {
-      // 长度不匹配：显示确认对话框，包含详细的错误数据
+      // 长度不匹配：显示自定义对话框，包含详细的错误数据
       const errorReason = codeLength < expectedLength ? '长度不足' : '长度超出';
       const diff = Math.abs(codeLength - expectedLength);
       
       // 构建详细的错误信息
-      let errorDetails = `⚠️ 数据异常警告\n\n`;
-      errorDetails += `${errorReason}！相差 ${diff} 个字符\n\n`;
+      let errorDetails = `${errorReason}！相差 ${diff} 个字符\n\n`;
       errorDetails += `期望长度: ${expectedLength}\n`;
       errorDetails += `实际长度: ${codeLength}\n\n`;
-      errorDetails += `错误数据内容:\n`;
-      errorDetails += `${trimmedCode}\n\n`;
+      errorDetails += `错误数据内容:\n${trimmedCode}\n\n`;
       
       // 如果长度不足，显示缺少多少
       if (codeLength < expectedLength) {
@@ -174,20 +171,13 @@ const Scan: React.FC = () => {
       
       errorDetails += `客户: ${currentCustomer?.name}\n`;
       errorDetails += `产品: ${products.find(p => p.id === productId)?.model}\n\n`;
-      errorDetails += `是否确认录入此异常数据？`;
+      errorDetails += `此异常数据不会被保存，请检查后重新扫描。`;
       
-      const confirmed = window.confirm(errorDetails);
-      
-      if (!confirmed) {
-        // 用户取消：清空输入框，聚焦
-        setCodeText('');
-        setNotes('');
-        setTimeout(() => {
-          codeInputRef.current?.focus();
-        }, 100);
-        return; // 不保存，直接返回
-      }
-      // 用户确认：继续执行保存逻辑
+      setDialogType('error');
+      setDialogTitle('数据异常警告');
+      setDialogMessage(errorDetails);
+      setShowDialog(true);
+      return; // 不保存，等待用户点击确定
     }
 
     setLoading(true);
@@ -242,6 +232,18 @@ const Scan: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // 处理对话框确认
+  const handleDialogConfirm = () => {
+    setShowDialog(false);
+    // 清空输入框
+    setCodeText('');
+    setNotes('');
+    // 聚焦输入框
+    setTimeout(() => {
+      codeInputRef.current?.focus();
+    }, 100);
   };
 
   // 处理输入变化（用于扫码枪智能检测）
@@ -571,6 +573,15 @@ const Scan: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 确认对话框 */}
+      <ConfirmDialog
+        show={showDialog}
+        type={dialogType}
+        title={dialogTitle}
+        message={dialogMessage}
+        onConfirm={handleDialogConfirm}
+      />
       </div>
     </>
   );
