@@ -264,11 +264,20 @@ backup_database() {
         print_success "数据库完整性检查通过"
     fi
     
-    BACKUP_DIR="backups"
-    mkdir -p "$BACKUP_DIR"
+    # 使用项目目录外的安全位置存储备份
+    # 优先级：/var/backups > /tmp > 用户家目录
+    if [ -d "/var/backups" ] && [ -w "/var/backups" ]; then
+        BACKUP_BASE_DIR="/var/backups/scan-code"
+    elif [ -n "$HOME" ] && [ -d "$HOME" ]; then
+        BACKUP_BASE_DIR="$HOME/.scan-code-backups"
+    else
+        BACKUP_BASE_DIR="/tmp/scan-code-backups"
+    fi
+    
+    mkdir -p "$BACKUP_BASE_DIR"
     
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-    DB_BACKUP_FILE="$BACKUP_DIR/db.sqlite.backup_$TIMESTAMP"
+    DB_BACKUP_FILE="$BACKUP_BASE_DIR/db.sqlite.backup_$TIMESTAMP"
     
     print_info "备份数据库到: $DB_BACKUP_FILE"
     
@@ -293,13 +302,14 @@ backup_database() {
     
     # 保留最近10个备份
     print_info "清理旧备份（保留最近10个）..."
-    ls -t "$BACKUP_DIR"/db.sqlite.backup_* 2>/dev/null | tail -n +11 | xargs -r rm
+    ls -t "$BACKUP_BASE_DIR"/db.sqlite.backup_* 2>/dev/null | tail -n +11 | xargs -r rm
     
     echo ""
     print_info "💾 备份信息："
+    echo "  备份目录: $BACKUP_BASE_DIR"
     echo "  备份文件: $DB_BACKUP_FILE"
     echo "  备份大小: $(du -h "$DB_BACKUP_FILE" | cut -f1)"
-    echo "  恢复命令: cp $DB_BACKUP_FILE db.sqlite"
+    echo "  恢复命令: cp $DB_BACKUP_FILE $PROJECT_DIR/db.sqlite"
     echo ""
 }
 
@@ -512,13 +522,12 @@ show_summary() {
     echo "  最新提交: $(git log -1 --oneline)"
     echo ""
     
-    if [ -d "$PROJECT_DIR/backups" ]; then
-        LATEST_BACKUP=$(ls -t "$PROJECT_DIR/backups"/db.sqlite.backup_* 2>/dev/null | head -1)
-        if [ -n "$LATEST_BACKUP" ]; then
-            echo "💾 数据库备份:"
-            echo "  最新备份: $LATEST_BACKUP"
-            echo ""
-        fi
+    if [ -n "$DB_BACKUP_FILE" ] && [ -f "$DB_BACKUP_FILE" ]; then
+        echo "💾 数据库备份:"
+        echo "  备份文件: $DB_BACKUP_FILE"
+        echo "  备份大小: $(du -h "$DB_BACKUP_FILE" | cut -f1)"
+        echo "  查看所有备份: ls -lh $(dirname "$DB_BACKUP_FILE")"
+        echo ""
     fi
     
     echo "🔧 常用命令:"
@@ -533,7 +542,7 @@ show_summary() {
     if [ -n "$DB_BACKUP_FILE" ]; then
         echo "⚠️  如遇问题:"
         echo "  1. 查看日志排查错误"
-        echo "  2. 恢复数据库备份: cp $DB_BACKUP_FILE db.sqlite"
+        echo "  2. 恢复数据库备份: cp $DB_BACKUP_FILE $PROJECT_DIR/db.sqlite"
         echo "  3. 回滚代码: git reset --hard <commit-hash>"
         echo ""
     fi
