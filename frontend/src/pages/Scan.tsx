@@ -113,8 +113,9 @@ const Scan: React.FC = () => {
       return;
     }
 
-    // 检查是否重复扫码（在今日记录中查找相同的二维码）
     const trimmedCode = codeText.trim();
+    
+    // 检查是否重复扫码（在今日记录中查找相同的二维码）
     const isDuplicate = todayScans.some(scan => 
       scan.code_text === trimmedCode && 
       scan.customer_id === customerId && 
@@ -122,26 +123,51 @@ const Scan: React.FC = () => {
     );
 
     if (isDuplicate) {
-      // 重复扫码：显示警告信息
-      setStatusMessage('⚠️ 重复扫码！该二维码今日已扫描过');
-      setStatusType('error');
+      // 重复扫码：显示确认对话框
+      const confirmed = window.confirm(
+        '⚠️ 重复扫码警告\n\n' +
+        '该二维码今日已扫描过！\n' +
+        `二维码: ${trimmedCode}\n` +
+        `客户: ${currentCustomer?.name}\n` +
+        `产品: ${products.find(p => p.id === productId)?.model}\n\n` +
+        '是否确认继续录入？'
+      );
       
-      // 清空输入框
-      setCodeText('');
-      setNotes('');
+      if (!confirmed) {
+        // 用户取消：清空输入框，聚焦
+        setCodeText('');
+        setNotes('');
+        setTimeout(() => {
+          codeInputRef.current?.focus();
+        }, 100);
+        return; // 不保存，直接返回
+      }
+      // 用户确认：继续执行保存逻辑
+    }
+
+    // 检查长度是否匹配
+    if (!isValid) {
+      // 长度不匹配：显示确认对话框
+      const errorReason = codeLength < expectedLength ? '长度不足' : '长度超出';
+      const confirmed = window.confirm(
+        '⚠️ 数据异常警告\n\n' +
+        `${errorReason}！\n` +
+        `期望长度: ${expectedLength}\n` +
+        `实际长度: ${codeLength}\n` +
+        `二维码: ${trimmedCode}\n\n` +
+        '是否确认录入此异常数据？'
+      );
       
-      // 聚焦输入框
-      setTimeout(() => {
-        codeInputRef.current?.focus();
-      }, 100);
-      
-      // 3秒后清除警告信息
-      setTimeout(() => {
-        setStatusMessage('');
-        setStatusType('');
-      }, 3000);
-      
-      return; // 不保存，直接返回
+      if (!confirmed) {
+        // 用户取消：清空输入框，聚焦
+        setCodeText('');
+        setNotes('');
+        setTimeout(() => {
+          codeInputRef.current?.focus();
+        }, 100);
+        return; // 不保存，直接返回
+      }
+      // 用户确认：继续执行保存逻辑
     }
 
     setLoading(true);
