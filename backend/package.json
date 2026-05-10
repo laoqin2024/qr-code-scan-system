@@ -7,7 +7,8 @@
     "dev": "tsx watch src/app.ts",
     "start": "tsx src/app.ts",
     "init-db": "tsx src/init-db-v2.ts",
-    "migrate-v3": "tsx src/migrate-v3.ts"
+    "migrate-v3": "tsx src/migrate-v3.ts",
+    "fix-timezone": "tsx src/fix-timezone.ts"
   },
   "dependencies": {
     "@types/better-sqlite3": "^7.6.13",
