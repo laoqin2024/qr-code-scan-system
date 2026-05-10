@@ -147,16 +147,36 @@ const Scan: React.FC = () => {
 
     // 检查长度是否匹配
     if (!isValid) {
-      // 长度不匹配：显示确认对话框
+      // 长度不匹配：显示确认对话框，包含详细的错误数据
       const errorReason = codeLength < expectedLength ? '长度不足' : '长度超出';
-      const confirmed = window.confirm(
-        '⚠️ 数据异常警告\n\n' +
-        `${errorReason}！\n` +
-        `期望长度: ${expectedLength}\n` +
-        `实际长度: ${codeLength}\n` +
-        `二维码: ${trimmedCode}\n\n` +
-        '是否确认录入此异常数据？'
-      );
+      const diff = Math.abs(codeLength - expectedLength);
+      
+      // 构建详细的错误信息
+      let errorDetails = `⚠️ 数据异常警告\n\n`;
+      errorDetails += `${errorReason}！相差 ${diff} 个字符\n\n`;
+      errorDetails += `期望长度: ${expectedLength}\n`;
+      errorDetails += `实际长度: ${codeLength}\n\n`;
+      errorDetails += `错误数据内容:\n`;
+      errorDetails += `${trimmedCode}\n\n`;
+      
+      // 如果长度不足，显示缺少多少
+      if (codeLength < expectedLength) {
+        errorDetails += `缺少: ${diff} 个字符\n`;
+        errorDetails += `当前: [${trimmedCode}]\n`;
+        errorDetails += `应为: [${trimmedCode}${'?'.repeat(diff)}]\n\n`;
+      } else {
+        // 如果长度超出，显示多余的部分
+        const extra = trimmedCode.substring(expectedLength);
+        const normal = trimmedCode.substring(0, expectedLength);
+        errorDetails += `正常部分: [${normal}]\n`;
+        errorDetails += `多余部分: [${extra}] (${diff} 个字符)\n\n`;
+      }
+      
+      errorDetails += `客户: ${currentCustomer?.name}\n`;
+      errorDetails += `产品: ${products.find(p => p.id === productId)?.model}\n\n`;
+      errorDetails += `是否确认录入此异常数据？`;
+      
+      const confirmed = window.confirm(errorDetails);
       
       if (!confirmed) {
         // 用户取消：清空输入框，聚焦
