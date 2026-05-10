@@ -191,7 +191,6 @@ handle_error() {
 
 # 设置错误捕获
 trap 'handle_error $LINENO' ERR
-}
 
 # 检测项目目录
 detect_project_dir() {
