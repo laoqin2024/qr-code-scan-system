@@ -540,41 +540,91 @@ init_database() {
     
     # 检查数据库是否已存在
     if [ -f "$INSTALL_DIR/db.sqlite" ]; then
-        print_warning "数据库文件已存在"
-        read -p "是否重新初始化数据库？(y/n) [默认: n]: " REINIT_DB
-        REINIT_DB=${REINIT_DB:-n}
+        print_warning "检测到数据库文件已存在"
         
-        if [ "$REINIT_DB" = "y" ]; then
-            print_info "删除旧数据库..."
-            rm -f "$INSTALL_DIR/db.sqlite"
+        # 检查数据库完整性
+        print_info "检查数据库完整性..."
+        if sqlite3 "$INSTALL_DIR/db.sqlite" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+            print_success "数据库完整性检查通过"
+            
+            # 检查是否有用户数据
+            USER_COUNT=$(sqlite3 "$INSTALL_DIR/db.sqlite" "SELECT COUNT(*) FROM users;" 2>/dev/null || echo "0")
+            
+            if [ "$USER_COUNT" -gt 0 ]; then
+                print_info "数据库包含 $USER_COUNT 个用户"
+                read -p "是否保留现有数据库？(y/n) [默认: y]: " KEEP_DB
+                KEEP_DB=${KEEP_DB:-y}
+                
+                if [[ $KEEP_DB =~ ^[Yy]$ ]]; then
+                    print_success "保留现有数据库"
+                    return
+                else
+                    print_warning "将重新初始化数据库（现有数据将丢失）"
+                    rm -f "$INSTALL_DIR/db.sqlite"
+                fi
+            else
+                print_warning "数据库为空，将重新初始化"
+                rm -f "$INSTALL_DIR/db.sqlite"
+            fi
         else
-            print_info "跳过数据库初始化，使用现有数据库"
-            return
+            print_error "数据库文件已损坏"
+            read -p "是否删除并重新初始化？(y/n) [默认: y]: " REINIT_DB
+            REINIT_DB=${REINIT_DB:-y}
+            
+            if [[ $REINIT_DB =~ ^[Yy]$ ]]; then
+                print_info "删除损坏的数据库..."
+                rm -f "$INSTALL_DIR/db.sqlite"
+            else
+                print_error "无法继续部署，数据库已损坏"
+                exit 1
+            fi
         fi
     fi
     
-    # 优先使用预初始化的数据库文件
-    if [ -f "$INSTALL_DIR/db.sqlite.init" ]; then
-        print_info "使用预初始化的数据库文件..."
-        cp "$INSTALL_DIR/db.sqlite.init" "$INSTALL_DIR/db.sqlite"
-        print_success "数据库初始化完成（使用预置文件）"
-    else
-        print_info "运行数据库初始化脚本..."
-        cd "$INSTALL_DIR/backend"
-        npm run init-db
-        
-        if [ $? -eq 0 ]; then
-            print_success "数据库初始化完成"
+    # 如果数据库不存在，进行初始化
+    if [ ! -f "$INSTALL_DIR/db.sqlite" ]; then
+        # 优先使用预初始化的数据库文件
+        if [ -f "$INSTALL_DIR/db.sqlite.init" ]; then
+            print_info "使用预初始化的数据库文件..."
+            cp "$INSTALL_DIR/db.sqlite.init" "$INSTALL_DIR/db.sqlite"
+            
+            # 验证复制的数据库
+            if sqlite3 "$INSTALL_DIR/db.sqlite" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+                print_success "数据库初始化完成（使用预置文件）"
+            else
+                print_error "预置数据库文件损坏，尝试运行初始化脚本..."
+                rm -f "$INSTALL_DIR/db.sqlite"
+                cd "$INSTALL_DIR/backend"
+                npm run init-db
+            fi
         else
-            print_error "数据库初始化失败"
-            print_info "提示: 可以手动创建 db.sqlite.init 文件作为初始数据库模板"
+            print_info "运行数据库初始化脚本..."
+            cd "$INSTALL_DIR/backend"
+            npm run init-db
+            
+            if [ $? -eq 0 ]; then
+                print_success "数据库初始化完成"
+            else
+                print_error "数据库初始化失败"
+                print_info "提示: 可以手动创建 db.sqlite.init 文件作为初始数据库模板"
+                return 1
+            fi
+        fi
+        
+        # 最终验证
+        cd "$INSTALL_DIR"
+        if [ -f "db.sqlite" ] && sqlite3 "db.sqlite" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+            print_success "数据库验证通过"
+            print_info "默认账号:"
+            echo "  超级管理员: admin / admin123"
+            echo "  客户管理员: test / test123"
+        else
+            print_error "数据库初始化失败或文件损坏"
             return 1
         fi
+    else
+        print_info "使用现有数据库"
     fi
-    
-    print_info "默认账号:"
-    echo "  超级管理员: admin / admin123"
-    echo "  客户管理员: test / test123"
 }
 
 # 配置 Nginx
