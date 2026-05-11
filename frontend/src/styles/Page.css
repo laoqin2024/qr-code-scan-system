@@ -393,7 +393,8 @@ table tbody tr:last-child td {
 }
 
 .list-header h3 {
-  margin-bottom: 0; /* 覆盖默认的 margin-bottom */
+  margin-bottom: 0;
+  flex-shrink: 0; /* 防止标题被压缩 */
 }
 
 /* 统计标签 */
@@ -533,6 +534,11 @@ table tbody tr:last-child td {
   .list-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 12px;
+  }
+
+  .list-header h3 {
+    width: 100%;
   }
 
   .stats-badges {
