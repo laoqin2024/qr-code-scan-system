@@ -249,23 +249,11 @@ const Query: React.FC = () => {
       <div className="list-card">
         <div className="list-header">
           <h3>扫码记录</h3>
-          <div className="stats-summary">
-            <div className="stat-item stat-total">
-              <span className="stat-label">总记录数</span>
-              <span className="stat-value">{totalCount}</span>
-            </div>
-            <div className="stat-item stat-today">
-              <span className="stat-label">今日扫码</span>
-              <span className="stat-value">{todayCount}</span>
-            </div>
-            <div className="stat-item stat-valid">
-              <span className="stat-label">正常</span>
-              <span className="stat-value">{validCount}</span>
-            </div>
-            <div className="stat-item stat-invalid">
-              <span className="stat-label">异常</span>
-              <span className="stat-value">{invalidCount}</span>
-            </div>
+          <div className="stats-badges">
+            <span className="stats-badge badge-total">总记录数: {totalCount}</span>
+            <span className="stats-badge badge-today">今日扫码: {todayCount}</span>
+            <span className="stats-badge badge-valid">正常: {validCount}</span>
+            <span className="stats-badge badge-invalid">异常: {invalidCount}</span>
           </div>
         </div>
         

@@ -396,67 +396,37 @@ table tbody tr:last-child td {
   margin-bottom: 0; /* 覆盖默认的 margin-bottom */
 }
 
-/* 统计摘要 */
-.stats-summary {
+/* 统计标签 */
+.stats-badges {
   display: flex;
-  gap: 15px;
+  gap: 10px;
   flex-wrap: wrap;
-  color: initial; /* 重置颜色继承 */
 }
 
-.stats-summary * {
-  color: white !important; /* 强制所有元素白色 */
+.stats-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  white-space: nowrap;
 }
 
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 20px;
-  border-radius: 8px;
-  min-width: 100px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  color: white !important; /* 强制白色文字 */
-}
-
-.stat-item * {
-  color: white !important; /* 强制所有子元素白色 */
-}
-
-.stat-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.stat-item.stat-total {
+.stats-badge.badge-total {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.stat-item.stat-today {
+.stats-badge.badge-today {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
 }
 
-.stat-item.stat-valid {
+.stats-badge.badge-valid {
   background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
 }
 
-.stat-item.stat-invalid {
+.stats-badge.badge-invalid {
   background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-}
-
-.stat-label {
-  font-size: 12px;
-  opacity: 0.95; /* 稍微提高不透明度 */
-  margin-bottom: 5px;
-  color: white !important; /* 强制白色 */
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: white !important; /* 强制白色 */
 }
 
 /* 分页信息 */
@@ -555,25 +525,13 @@ table tbody tr:last-child td {
     align-items: flex-start;
   }
 
-  .stats-summary {
+  .stats-badges {
     width: 100%;
-    justify-content: space-between;
   }
 
-  .stat-item {
-    flex: 1;
-    min-width: auto;
-    padding: 8px 10px;
-  }
-
-  .stat-label {
-    font-size: 11px;
-    color: white !important; /* 强制白色 */
-  }
-
-  .stat-value {
-    font-size: 18px;
-    color: white !important; /* 强制白色 */
+  .stats-badge {
+    font-size: 12px;
+    padding: 5px 12px;
   }
 
   .pagination-info {
