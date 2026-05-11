@@ -429,6 +429,16 @@ table tbody tr:last-child td {
   background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
 }
 
+.stats-badge.badge-my {
+  background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+}
+
+.stats-badge.badge-rate {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: #333;
+  font-weight: 700;
+}
+
 /* 分页信息 */
 .pagination-info {
   display: flex;

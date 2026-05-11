@@ -317,7 +317,16 @@ const Scan: React.FC = () => {
     const valid = todayScans.filter(s => s.is_valid).length;
     const invalid = total - valid;
     const validRate = total > 0 ? ((valid / total) * 100).toFixed(1) : '0';
-    return { total, valid, invalid, validRate };
+    
+    // 计算当前用户今日扫码数
+    const userStr = localStorage.getItem('user');
+    let myScans = 0;
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      myScans = todayScans.filter(s => s.user_id === user.id).length;
+    }
+    
+    return { total, valid, invalid, validRate, myScans };
   };
 
   const stats = getTodayStats();
@@ -475,7 +484,16 @@ const Scan: React.FC = () => {
 
       {/* 今日扫码列表 */}
       <div className="today-scans-card">
-        <h3>今日扫码记录 ({todayScans.length} 条)</h3>
+        <div className="list-header">
+          <h3>今日扫码记录</h3>
+          <div className="stats-badges">
+            <span className="stats-badge badge-total">今日总数: {stats.total}</span>
+            <span className="stats-badge badge-my">我的扫码: {stats.myScans}</span>
+            <span className="stats-badge badge-valid">正常: {stats.valid}</span>
+            <span className="stats-badge badge-invalid">异常: {stats.invalid}</span>
+            <span className="stats-badge badge-rate">正常率: {stats.validRate}%</span>
+          </div>
+        </div>
         {todayScans.length === 0 ? (
           <div className="empty-state">
             <p>暂无今日扫码记录</p>
