@@ -392,11 +392,20 @@ table tbody tr:last-child td {
   gap: 15px;
 }
 
+.list-header h3 {
+  margin-bottom: 0; /* 覆盖默认的 margin-bottom */
+}
+
 /* 统计摘要 */
 .stats-summary {
   display: flex;
   gap: 15px;
   flex-wrap: wrap;
+  color: initial; /* 重置颜色继承 */
+}
+
+.stats-summary * {
+  color: white !important; /* 强制所有元素白色 */
 }
 
 .stat-item {
