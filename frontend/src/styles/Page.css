@@ -397,6 +397,10 @@ table tbody tr:last-child td {
   flex-shrink: 0; /* 防止标题被压缩 */
 }
 
+.list-header h3::before {
+  display: none; /* 隐藏蓝色竖线图标 */
+}
+
 /* 统计标签 */
 .stats-badges {
   display: flex;
@@ -542,6 +546,7 @@ table tbody tr:last-child td {
   }
 
   .stats-badges {
+    display: block;
     width: 100%;
   }
 
