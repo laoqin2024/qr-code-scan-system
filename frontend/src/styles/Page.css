@@ -408,7 +408,11 @@ table tbody tr:last-child td {
   min-width: 100px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
-  color: white; /* 统一设置白色文字 */
+  color: white !important; /* 强制白色文字 */
+}
+
+.stat-item * {
+  color: white !important; /* 强制所有子元素白色 */
 }
 
 .stat-item:hover {
