@@ -360,12 +360,6 @@ const Scan: React.FC = () => {
               <span className="toggle-text">连续扫码</span>
             </label>
           </div>
-          <div className="today-stats-badge">
-            <span className="stats-label">今日扫码:</span>
-            <span className="stats-total">{stats.total}</span>
-            <span className="stats-valid">✓ {stats.valid}</span>
-            <span className="stats-invalid">✗ {stats.invalid}</span>
-          </div>
         </div>
       </div>
 
