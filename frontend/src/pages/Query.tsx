@@ -18,9 +18,19 @@ const Query: React.FC = () => {
   const [filterStartTime, setFilterStartTime] = useState('');
   const [filterEndTime, setFilterEndTime] = useState('');
   const [filterValid, setFilterValid] = useState<any>('');
-  const [filterCodeText, setFilterCodeText] = useState(''); // 新增：二维码搜索
+  const [filterCodeText, setFilterCodeText] = useState('');
   
   const [users, setUsers] = useState<any[]>([]);
+  
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  
+  // 统计信息
+  const [totalCount, setTotalCount] = useState(0);
+  const [todayCount, setTodayCount] = useState(0);
+  const [validCount, setValidCount] = useState(0);
+  const [invalidCount, setInvalidCount] = useState(0);
 
   useEffect(() => {
     // 获取当前用户角色
@@ -81,7 +91,25 @@ const Query: React.FC = () => {
         );
       }
       
+      // 计算统计信息
+      setTotalCount(filteredScans.length);
+      
+      // 计算今日扫码数
+      const today = new Date().toISOString().split('T')[0];
+      const todayScans = filteredScans.filter((scan: ScanRecord) => 
+        scan.created_at.startsWith(today)
+      );
+      setTodayCount(todayScans.length);
+      
+      // 计算正常和异常数量
+      const valid = filteredScans.filter((scan: ScanRecord) => scan.is_valid).length;
+      setValidCount(valid);
+      setInvalidCount(filteredScans.length - valid);
+      
       setScans(filteredScans);
+      
+      // 重置到第一页
+      setCurrentPage(1);
     } catch (err: any) {
       setError(err.response?.data?.error || '查询失败');
     } finally {
@@ -111,6 +139,22 @@ const Query: React.FC = () => {
 
   const getCustomerName = (id: number) => customers.find(c => c.id === id)?.name || '-';
   const getProductModel = (id: number) => products.find(p => p.id === id)?.model || '-';
+
+  // 分页逻辑
+  const totalPages = Math.ceil(scans.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentScans = scans.slice(startIndex, endIndex);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const handleDelete = async (id: number) => {
     if (!window.confirm('确定要删除这条扫码记录吗？')) return;
@@ -203,61 +247,162 @@ const Query: React.FC = () => {
       </div>
 
       <div className="list-card">
-        <h3>扫码记录</h3>
+        <div className="list-header">
+          <h3>扫码记录</h3>
+          <div className="stats-summary">
+            <div className="stat-item stat-total">
+              <span className="stat-label">总记录数</span>
+              <span className="stat-value">{totalCount}</span>
+            </div>
+            <div className="stat-item stat-today">
+              <span className="stat-label">今日扫码</span>
+              <span className="stat-value">{todayCount}</span>
+            </div>
+            <div className="stat-item stat-valid">
+              <span className="stat-label">正常</span>
+              <span className="stat-value">{validCount}</span>
+            </div>
+            <div className="stat-item stat-invalid">
+              <span className="stat-label">异常</span>
+              <span className="stat-value">{invalidCount}</span>
+            </div>
+          </div>
+        </div>
+        
         {loading ? (
           <p>加载中...</p>
         ) : scans.length === 0 ? (
           <p>暂无记录</p>
         ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>客户</th>
-                <th>产品</th>
-                <th>二维码</th>
-                <th>长度</th>
-                <th>录入人员</th>
-                <th>状态</th>
-                <th>异常原因</th>
-                <th>备注</th>
-                <th>时间</th>
-                {currentUserRole === 'super_admin' && <th>操作</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {scans.map(s => (
-                <tr key={s.id} className={s.is_valid ? '' : 'invalid-row'}>
-                  <td>{s.customer_name || getCustomerName(s.customer_id)}</td>
-                  <td>{s.product_model || getProductModel(s.product_id)}</td>
-                  <td className="code-text" title={s.code_text}>
-                    <div className="code-text-wrapper">{s.code_text}</div>
-                  </td>
-                  <td>{s.code_length}</td>
-                  <td>
-                    <div className="user-info-cell">
-                      <span className="user-name">{s.display_name || s.username || '-'}</span>
-                      {s.display_name && s.username && (
-                        <span className="user-account">({s.username})</span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    <span className={s.is_valid ? 'badge-success' : 'badge-danger'}>
-                      {s.is_valid ? '✓ 正常' : '✗ 异常'}
-                    </span>
-                  </td>
-                  <td>{s.error_reason || '-'}</td>
-                  <td>{s.notes || '-'}</td>
-                  <td>{new Date(s.created_at).toLocaleString('zh-CN')}</td>
-                  {currentUserRole === 'super_admin' && (
-                    <td>
-                      <button onClick={() => handleDelete(s.id)} className="btn-delete-small">删除</button>
-                    </td>
-                  )}
+          <>
+            <div className="pagination-info">
+              <span>共 {totalCount} 条记录，显示第 {startIndex + 1} - {Math.min(endIndex, totalCount)} 条</span>
+              <div className="page-size-selector">
+                <label>每页显示：</label>
+                <select value={pageSize} onChange={e => handlePageSizeChange(parseInt(e.target.value))}>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
+              </div>
+            </div>
+            
+            <table>
+              <thead>
+                <tr>
+                  <th>序号</th>
+                  <th>客户</th>
+                  <th>产品</th>
+                  <th>二维码</th>
+                  <th>长度</th>
+                  <th>录入人员</th>
+                  <th>状态</th>
+                  <th>异常原因</th>
+                  <th>备注</th>
+                  <th>时间</th>
+                  {currentUserRole === 'super_admin' && <th>操作</th>}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {currentScans.map((s, index) => (
+                  <tr key={s.id} className={s.is_valid ? '' : 'invalid-row'}>
+                    <td>{startIndex + index + 1}</td>
+                    <td>{s.customer_name || getCustomerName(s.customer_id)}</td>
+                    <td>{s.product_model || getProductModel(s.product_id)}</td>
+                    <td className="code-text" title={s.code_text}>
+                      <div className="code-text-wrapper">{s.code_text}</div>
+                    </td>
+                    <td>{s.code_length}</td>
+                    <td>
+                      <div className="user-info-cell">
+                        <span className="user-name">{s.display_name || s.username || '-'}</span>
+                        {s.display_name && s.username && (
+                          <span className="user-account">({s.username})</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={s.is_valid ? 'badge-success' : 'badge-danger'}>
+                        {s.is_valid ? '✓ 正常' : '✗ 异常'}
+                      </span>
+                    </td>
+                    <td>{s.error_reason || '-'}</td>
+                    <td>{s.notes || '-'}</td>
+                    <td>{new Date(s.created_at).toLocaleString('zh-CN')}</td>
+                    {currentUserRole === 'super_admin' && (
+                      <td>
+                        <button onClick={() => handleDelete(s.id)} className="btn-delete-small">删除</button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  className="pagination-btn"
+                  onClick={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                >
+                  首页
+                </button>
+                <button 
+                  className="pagination-btn"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  上一页
+                </button>
+                
+                <div className="pagination-pages">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        className={`pagination-btn ${currentPage === pageNum ? 'active' : ''}`}
+                        onClick={() => handlePageChange(pageNum)}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button 
+                  className="pagination-btn"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  下一页
+                </button>
+                <button 
+                  className="pagination-btn"
+                  onClick={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  末页
+                </button>
+                
+                <span className="pagination-info-text">
+                  第 {currentPage} / {totalPages} 页
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
       </div>
