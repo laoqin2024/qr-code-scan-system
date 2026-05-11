@@ -408,6 +408,7 @@ table tbody tr:last-child td {
   min-width: 100px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
+  color: white; /* 统一设置白色文字 */
 }
 
 .stat-item:hover {
@@ -417,33 +418,32 @@ table tbody tr:last-child td {
 
 .stat-item.stat-total {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
 }
 
 .stat-item.stat-today {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: white;
 }
 
 .stat-item.stat-valid {
   background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: white;
 }
 
 .stat-item.stat-invalid {
   background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  color: white;
 }
 
 .stat-label {
   font-size: 12px;
-  opacity: 0.9;
+  opacity: 0.95; /* 稍微提高不透明度 */
   margin-bottom: 5px;
+  color: white; /* 明确设置白色 */
+  font-weight: 500;
 }
 
 .stat-value {
   font-size: 24px;
   font-weight: 700;
+  color: white; /* 明确设置白色 */
 }
 
 /* 分页信息 */
