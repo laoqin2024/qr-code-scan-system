@@ -49,6 +49,56 @@ check_command() {
     return 0
 }
 
+# 检查数据库完整性（避免将「未安装 sqlite3」或「数据库被锁定」误判为损坏）
+check_db_integrity() {
+    local db_file="$1"
+
+    if check_command sqlite3; then
+        local result
+        result=$(sqlite3 "$db_file" "PRAGMA integrity_check;" 2>&1) || true
+
+        if [ "$result" = "ok" ]; then
+            return 0
+        fi
+
+        if echo "$result" | grep -qiE 'locked|busy'; then
+            print_warning "数据库正在被后端使用（锁定），跳过在线完整性检查"
+            return 0
+        fi
+
+        if [ -z "$result" ]; then
+            print_warning "sqlite3 未返回检查结果，跳过完整性检查"
+            return 0
+        fi
+
+        print_error "完整性检查结果: $result"
+        return 1
+    fi
+
+    if [ -f "$PROJECT_DIR/backend/node_modules/better-sqlite3/package.json" ]; then
+        local result
+        result=$(cd "$PROJECT_DIR/backend" && node -e "
+          const path = require('path');
+          const Database = require('better-sqlite3');
+          const db = new Database(path.resolve(process.argv[1]), { readonly: true, fileMustExist: true });
+          console.log(db.pragma('integrity_check', { simple: true }));
+          db.close();
+        " "$db_file" 2>&1) || true
+
+        if [ "$result" = "ok" ]; then
+            return 0
+        fi
+
+        if [ -n "$result" ]; then
+            print_error "完整性检查结果: $result"
+            return 1
+        fi
+    fi
+
+    print_warning "未安装 sqlite3，跳过完整性检查（不影响备份和更新）"
+    return 0
+}
+
 # 主函数
 main() {
     clear
@@ -110,7 +160,7 @@ main() {
     
     # 验证数据库
     if [ -f "$PROJECT_DIR/db.sqlite" ]; then
-        if sqlite3 "$PROJECT_DIR/db.sqlite" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+        if check_db_integrity "$PROJECT_DIR/db.sqlite"; then
             print_success "✓ 数据库完整性验证通过"
         else
             print_error "✗ 数据库验证失败！"
@@ -251,8 +301,8 @@ backup_database() {
     
     # 检查数据库文件完整性
     print_info "检查数据库完整性..."
-    if ! sqlite3 db.sqlite "PRAGMA integrity_check;" > /dev/null 2>&1; then
-        print_error "数据库文件已损坏！"
+    if ! check_db_integrity "$PROJECT_DIR/db.sqlite"; then
+        print_error "数据库文件可能已损坏！"
         print_warning "建议从备份恢复或重新初始化"
         read -p "是否继续更新？(y/n) [默认: n]: " CONTINUE_WITH_BAD_DB
         CONTINUE_WITH_BAD_DB=${CONTINUE_WITH_BAD_DB:-n}
@@ -287,7 +337,7 @@ backup_database() {
         print_success "数据库备份完成"
         
         # 验证备份文件
-        if sqlite3 "$DB_BACKUP_FILE" "PRAGMA integrity_check;" > /dev/null 2>&1; then
+        if check_db_integrity "$DB_BACKUP_FILE"; then
             print_success "备份文件验证通过"
         else
             print_error "备份文件验证失败！"
