@@ -4,6 +4,11 @@ import api, { scanAPI } from '../api';
 import { ScanRecord, Customer, Product, UserRole } from '../types';
 import '../styles/Page.css';
 
+function formatDateTimeLocal(value: string): string {
+  if (!value) return '';
+  return value.replace('T', ' ');
+}
+
 const Query: React.FC = () => {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -68,48 +73,27 @@ const Query: React.FC = () => {
     }
   };
 
-  const fetchScans = async () => {
+  const fetchScans = async (page = currentPage) => {
     setLoading(true);
     setError('');
     try {
-      const params: any = {};
+      const params: any = { page, limit: pageSize };
       if (filterCustomerId) params.customer_id = filterCustomerId;
       if (filterProductId) params.product_id = filterProductId;
       if (filterUserId) params.user_id = filterUserId;
-      if (filterStartTime) params.start_time = filterStartTime;
-      if (filterEndTime) params.end_time = filterEndTime;
+      if (filterStartTime) params.start_time = formatDateTimeLocal(filterStartTime);
+      if (filterEndTime) params.end_time = formatDateTimeLocal(filterEndTime);
       if (filterValid !== '') params.is_valid = filterValid === 'true' ? 1 : 0;
+      if (filterCodeText.trim()) params.code_text = filterCodeText.trim();
 
-      const res = await api.get('/scans', { params });
-      
-      // 前端过滤：如果有二维码搜索条件，进行模糊匹配
-      let filteredScans = res.data;
-      if (filterCodeText.trim()) {
-        const searchText = filterCodeText.trim().toLowerCase();
-        filteredScans = res.data.filter((scan: ScanRecord) => 
-          scan.code_text.toLowerCase().includes(searchText)
-        );
-      }
-      
-      // 计算统计信息
-      setTotalCount(filteredScans.length);
-      
-      // 计算今日扫码数
-      const today = new Date().toISOString().split('T')[0];
-      const todayScans = filteredScans.filter((scan: ScanRecord) => 
-        scan.created_at.startsWith(today)
-      );
-      setTodayCount(todayScans.length);
-      
-      // 计算正常和异常数量
-      const valid = filteredScans.filter((scan: ScanRecord) => scan.is_valid).length;
-      setValidCount(valid);
-      setInvalidCount(filteredScans.length - valid);
-      
-      setScans(filteredScans);
-      
-      // 重置到第一页
-      setCurrentPage(1);
+      const res = await scanAPI.getScans(params);
+
+      setScans(res.data.scans);
+      setTotalCount(res.data.stats.total);
+      setTodayCount(res.data.stats.today_count);
+      setValidCount(res.data.stats.valid_count);
+      setInvalidCount(res.data.stats.invalid_count);
+      setCurrentPage(res.data.pagination.page);
     } catch (err: any) {
       setError(err.response?.data?.error || '查询失败');
     } finally {
@@ -124,8 +108,15 @@ const Query: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchScans();
-  }, [filterCustomerId, filterProductId, filterUserId, filterStartTime, filterEndTime, filterValid, filterCodeText]);
+    setCurrentPage(1);
+    fetchScans(1);
+  }, [filterCustomerId, filterProductId, filterUserId, filterStartTime, filterEndTime, filterValid, filterCodeText, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > 1) {
+      fetchScans(currentPage);
+    }
+  }, [currentPage]);
 
   // 当客户改变时，重置产品选择
   useEffect(() => {
@@ -141,10 +132,10 @@ const Query: React.FC = () => {
   const getProductModel = (id: number) => products.find(p => p.id === id)?.model || '-';
 
   // 分页逻辑
-  const totalPages = Math.ceil(scans.length / pageSize);
+  const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentScans = scans.slice(startIndex, endIndex);
+  const endIndex = Math.min(startIndex + scans.length, totalCount);
+  const currentScans = scans;
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -153,6 +144,27 @@ const Query: React.FC = () => {
 
   const handlePageSizeChange = (size: number) => {
     setPageSize(size);
+    setCurrentPage(1);
+  };
+
+  const hasActiveFilters = Boolean(
+    filterCustomerId ||
+    filterProductId ||
+    filterUserId ||
+    filterStartTime ||
+    filterEndTime ||
+    filterValid !== '' ||
+    filterCodeText.trim()
+  );
+
+  const handleClearFilters = () => {
+    setFilterCustomerId(0);
+    setFilterProductId(0);
+    setFilterUserId(0);
+    setFilterStartTime('');
+    setFilterEndTime('');
+    setFilterValid('');
+    setFilterCodeText('');
     setCurrentPage(1);
   };
 
@@ -176,7 +188,17 @@ const Query: React.FC = () => {
         {error && <div className="error-msg">{error}</div>}
 
         <div className="filter-card">
-          <h3>筛选条件</h3>
+          <div className="filter-header">
+            <h3>筛选条件</h3>
+            <button
+              type="button"
+              className="btn-secondary btn-clear-filters"
+              onClick={handleClearFilters}
+              disabled={!hasActiveFilters}
+            >
+              清空条件
+            </button>
+          </div>
           <div className="filter-row">
             <div className="filter-item">
             <label>客户</label>
@@ -259,7 +281,7 @@ const Query: React.FC = () => {
         
         {loading ? (
           <p>加载中...</p>
-        ) : scans.length === 0 ? (
+        ) : totalCount === 0 ? (
           <p>暂无记录</p>
         ) : (
           <>

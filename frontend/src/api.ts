@@ -134,12 +134,20 @@ export const scanAPI = {
   
   getScans: (params?: { 
     customer_id?: number; 
-    product_id?: number; 
+    product_id?: number;
+    user_id?: number;
     start_time?: string; 
     end_time?: string; 
-    is_valid?: boolean 
+    is_valid?: number;
+    code_text?: string;
+    page?: number;
+    limit?: number;
   }) => 
-    api.get<ScanRecord[]>('/scans', { params }),
+    api.get<{
+      scans: ScanRecord[];
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+      stats: { total: number; valid_count: number; invalid_count: number; today_count: number };
+    }>('/scans', { params }),
   
   getStats: (params?: { 
     customer_id?: number; 

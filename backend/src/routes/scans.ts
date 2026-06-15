@@ -5,6 +5,30 @@ import { requireAuth, requireOperator, AuthRequest, canAccessCustomer } from '..
 
 const router = express.Router();
 
+function normalizeDateTime(value: string, isEnd = false): string {
+  let normalized = String(value).replace('T', ' ');
+  if (normalized.length === 16) {
+    normalized += isEnd ? ':59' : ':00';
+  }
+  return normalized;
+}
+
+function buildScanListQuery() {
+  return `
+    SELECT s.*, 
+           c.name as customer_name, 
+           p.model as product_model,
+           u.username,
+           u.display_name,
+           u.role as user_role
+    FROM scans s
+    JOIN customers c ON s.customer_id = c.id
+    JOIN products p ON s.product_id = p.id
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE 1=1
+  `;
+}
+
 // 扫码录入
 router.post('/', requireOperator, async (req: AuthRequest, res) => {
   try {
@@ -109,22 +133,10 @@ router.post('/', requireOperator, async (req: AuthRequest, res) => {
 router.get('/', requireAuth, async (req: AuthRequest, res) => {
   try {
     const user = req.user!;
-    const { customer_id, product_id, user_id, start_time, end_time, is_valid } = req.query;
+    const { customer_id, product_id, user_id, start_time, end_time, is_valid, page, limit, code_text } = req.query;
     const db = getDb();
     
-    let query = `
-      SELECT s.*, 
-             c.name as customer_name, 
-             p.model as product_model,
-             u.username,
-             u.display_name,
-             u.role as user_role
-      FROM scans s
-      JOIN customers c ON s.customer_id = c.id
-      JOIN products p ON s.product_id = p.id
-      LEFT JOIN users u ON s.user_id = u.id
-      WHERE 1=1
-    `;
+    let query = buildScanListQuery();
     const params: any[] = [];
     
     // 根据角色过滤数据
@@ -202,18 +214,65 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     
     if (start_time) {
       query += ' AND s.created_at >= ?';
-      params.push(start_time);
+      params.push(normalizeDateTime(start_time as string, false));
     }
     
     if (end_time) {
       query += ' AND s.created_at <= ?';
-      params.push(end_time);
+      params.push(normalizeDateTime(end_time as string, true));
     }
-    
-    query += ' ORDER BY s.created_at DESC LIMIT 1000';
+
+    if (code_text) {
+      query += ' AND s.code_text LIKE ?';
+      params.push(`%${code_text}%`);
+    }
+
+    const countQuery = query.replace(
+      /SELECT s\.\*,[\s\S]+?u\.role as user_role\s+FROM scans s/,
+      'SELECT COUNT(*) as total FROM scans s'
+    );
+    const countResult = db.prepare(countQuery).get(...params) as { total: number };
+    const total = countResult.total;
+
+    const statsQuery = query.replace(
+      /SELECT s\.\*,[\s\S]+?u\.role as user_role\s+FROM scans s/,
+      `SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN s.is_valid = 1 THEN 1 ELSE 0 END) as valid_count,
+        SUM(CASE WHEN s.is_valid = 0 THEN 1 ELSE 0 END) as invalid_count,
+        SUM(CASE WHEN date(s.created_at) = date('now', 'localtime') THEN 1 ELSE 0 END) as today_count
+      FROM scans s`
+    );
+    const stats = db.prepare(statsQuery).get(...params) as {
+      total: number;
+      valid_count: number;
+      invalid_count: number;
+      today_count: number;
+    };
+
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit as string) || 50));
+    const offset = (pageNum - 1) * limitNum;
+
+    query += ' ORDER BY s.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limitNum, offset);
     
     const scans = db.prepare(query).all(...params) as ScanRecordDetail[];
-    res.json(scans);
+    res.json({
+      scans,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      },
+      stats: {
+        total: stats.total || 0,
+        valid_count: stats.valid_count || 0,
+        invalid_count: stats.invalid_count || 0,
+        today_count: stats.today_count || 0
+      }
+    });
   } catch (error: any) {
     res.status(500).json({ error: '查询失败: ' + error.message });
   }
@@ -265,12 +324,12 @@ router.get('/stats', requireAuth, async (req: AuthRequest, res) => {
     
     if (start_time) {
       query += ' AND created_at >= ?';
-      params.push(start_time);
+      params.push(normalizeDateTime(start_time as string, false));
     }
     
     if (end_time) {
       query += ' AND created_at <= ?';
-      params.push(end_time);
+      params.push(normalizeDateTime(end_time as string, true));
     }
     
     const stats = db.prepare(query).get(...params) as any;

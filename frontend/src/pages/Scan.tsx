@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Navbar from '../components/Navbar';
 import ConfirmDialog from '../components/ConfirmDialog';
-import api from '../api';
+import api, { scanAPI } from '../api';
 import { Customer, Product, ScanRecord } from '../types';
 import '../styles/Scan.css';
 
@@ -55,13 +55,13 @@ const Scan: React.FC = () => {
   const fetchTodayScans = async () => {
     try {
       const today = new Date().toISOString().split('T')[0];
-      const res = await api.get('/scans', {
-        params: {
-          start_time: `${today} 00:00:00`,
-          end_time: `${today} 23:59:59`
-        }
+      const res = await scanAPI.getScans({
+        start_time: `${today} 00:00:00`,
+        end_time: `${today} 23:59:59`,
+        limit: 10000,
+        page: 1
       });
-      const scansWithNames = res.data.map((scan: ScanRecord) => ({
+      const scansWithNames = res.data.scans.map((scan: ScanRecord) => ({
         ...scan,
         customer_name: customers.find(c => c.id === scan.customer_id)?.name || '-',
         product_model: products.find(p => p.id === scan.product_id)?.model || '-'
