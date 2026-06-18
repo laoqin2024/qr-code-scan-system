@@ -148,6 +148,22 @@ export const scanAPI = {
       pagination: { page: number; limit: number; total: number; totalPages: number };
       stats: { total: number; valid_count: number; invalid_count: number; today_count: number };
     }>('/scans', { params }),
+
+  checkDuplicate: (params: {
+    customer_id: number;
+    product_id: number;
+    code_text: string;
+  }) =>
+    api.get<{
+      duplicate: boolean;
+      existing: {
+        id: number;
+        created_at: string;
+        is_valid: number;
+        customer_name: string;
+        product_model: string;
+      } | null;
+    }>('/scans/check-duplicate', { params }),
   
   getStats: (params?: { 
     customer_id?: number; 

@@ -29,6 +29,24 @@ function buildScanListQuery() {
   `;
 }
 
+function findDuplicateScan(db: ReturnType<typeof getDb>, customer_id: number, product_id: number, code_text: string) {
+  return db.prepare(`
+    SELECT s.id, s.created_at, s.is_valid, c.name as customer_name, p.model as product_model
+    FROM scans s
+    JOIN customers c ON s.customer_id = c.id
+    JOIN products p ON s.product_id = p.id
+    WHERE s.customer_id = ? AND s.product_id = ? AND s.code_text = ?
+    ORDER BY s.created_at DESC
+    LIMIT 1
+  `).get(customer_id, product_id, code_text) as {
+    id: number;
+    created_at: string;
+    is_valid: number;
+    customer_name: string;
+    product_model: string;
+  } | undefined;
+}
+
 // 扫码录入
 router.post('/', requireOperator, async (req: AuthRequest, res) => {
   try {
@@ -105,6 +123,15 @@ router.post('/', requireOperator, async (req: AuthRequest, res) => {
     } else if (code_length > customer.expected_length) {
       is_valid = 0;
       error_reason = '长度超出';
+    }
+
+    const duplicate = findDuplicateScan(db, customer_id, product_id, code_text);
+    if (duplicate) {
+      return res.status(409).json({
+        error: '该二维码已扫描过',
+        duplicate: true,
+        existing: duplicate
+      });
     }
     
     // 插入扫码记录（使用本地时间 UTC+8）
@@ -336,6 +363,32 @@ router.get('/stats', requireAuth, async (req: AuthRequest, res) => {
     res.json(stats);
   } catch (error: any) {
     res.status(500).json({ error: '统计失败: ' + error.message });
+  }
+});
+
+// 检查重复扫码（全历史，不限当日）
+router.get('/check-duplicate', requireOperator, async (req: AuthRequest, res) => {
+  try {
+    const { customer_id, product_id, code_text } = req.query;
+
+    if (!customer_id || !product_id || !code_text) {
+      return res.status(400).json({ error: '缺少必填参数' });
+    }
+
+    const db = getDb();
+    const existing = findDuplicateScan(
+      db,
+      parseInt(customer_id as string),
+      parseInt(product_id as string),
+      String(code_text)
+    );
+
+    res.json({
+      duplicate: !!existing,
+      existing: existing || null
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: '检查失败: ' + error.message });
   }
 });
 

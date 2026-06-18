@@ -99,6 +99,20 @@ const Scan: React.FC = () => {
   const expectedLength = currentCustomer?.expected_length || 0;
   const isValid = expectedLength === 0 || codeLength === expectedLength;
 
+  const showDuplicateDialog = (trimmedCode: string, scannedAt?: string) => {
+    const timeInfo = scannedAt ? `\n上次扫描时间: ${scannedAt}\n` : '';
+    setDialogType('duplicate');
+    setDialogTitle('重复扫码警告');
+    setDialogMessage(
+      `该二维码已扫描过！${timeInfo}\n` +
+      `二维码内容:\n${trimmedCode}\n\n` +
+      `客户: ${currentCustomer?.name}\n` +
+      `产品: ${products.find(p => p.id === productId)?.model}\n\n` +
+      `此数据不会被保存，请继续扫描下一个二维码。`
+    );
+    setShowDialog(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatusMessage('');
@@ -121,27 +135,26 @@ const Scan: React.FC = () => {
     }
 
     const trimmedCode = codeText.trim();
-    
-    // 检查是否重复扫码（在今日记录中查找相同的二维码）
-    const isDuplicate = todayScans.some(scan => 
-      scan.code_text === trimmedCode && 
-      scan.customer_id === customerId && 
-      scan.product_id === productId
-    );
 
-    if (isDuplicate) {
-      // 重复扫码：显示自定义对话框
-      setDialogType('duplicate');
-      setDialogTitle('重复扫码警告');
-      setDialogMessage(
-        `该二维码今日已扫描过！\n\n` +
-        `二维码内容:\n${trimmedCode}\n\n` +
-        `客户: ${currentCustomer?.name}\n` +
-        `产品: ${products.find(p => p.id === productId)?.model}\n\n` +
-        `此数据不会被保存，请继续扫描下一个二维码。`
-      );
-      setShowDialog(true);
-      return; // 不保存，等待用户点击确定
+    try {
+      const dupRes = await scanAPI.checkDuplicate({
+        customer_id: customerId,
+        product_id: productId,
+        code_text: trimmedCode
+      });
+
+      if (dupRes.data.duplicate) {
+        const scannedAt = dupRes.data.existing?.created_at
+          ? new Date(dupRes.data.existing.created_at).toLocaleString('zh-CN')
+          : undefined;
+        showDuplicateDialog(trimmedCode, scannedAt);
+        return;
+      }
+    } catch (err) {
+      console.error('重复检查失败', err);
+      setStatusMessage('重复检查失败，请稍后重试');
+      setStatusType('error');
+      return;
     }
 
     // 检查长度是否匹配
@@ -227,6 +240,13 @@ const Scan: React.FC = () => {
         }, 100);
       }
     } catch (err: any) {
+      if (err.response?.status === 409 && err.response?.data?.duplicate) {
+        const scannedAt = err.response.data.existing?.created_at
+          ? new Date(err.response.data.existing.created_at).toLocaleString('zh-CN')
+          : undefined;
+        showDuplicateDialog(trimmedCode, scannedAt);
+        return;
+      }
       setStatusMessage(err.response?.data?.error || '保存失败');
       setStatusType('error');
     } finally {
